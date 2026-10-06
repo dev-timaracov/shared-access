@@ -1,0 +1,140 @@
+from contextlib import asynccontextmanager
+from typing import Annotated
+from uuid import UUID
+
+import httpx
+from fastapi import Depends, FastAPI, Query, Request
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer
+from sqlalchemy import text
+
+from app.auth import AuthMiddleware
+from app.config import Settings
+from app.db import create_database
+from app.errors import ServiceError
+from app.mcp_server import create_mcp
+from app.plane import PlaneClient
+from app.schemas import (
+    DocumentPut,
+    ProjectCreate,
+    ReportCreate,
+    SessionCreate,
+    TaskCreate,
+    Transition,
+)
+from app.service import ContextService
+
+
+def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None = None):
+    settings = settings or Settings()
+    engine, sessions = create_database(settings.database_url)
+    plane_http = http or httpx.AsyncClient(timeout=20, follow_redirects=False)
+    service = ContextService(settings, sessions, PlaneClient(settings, plane_http))
+    mcp = create_mcp(service, settings)
+    mcp_app = mcp.streamable_http_app()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        # Mounted sub-app lifespan is not executed by FastAPI automatically.
+        async with mcp.session_manager.run():
+            try:
+                yield
+            finally:
+                await engine.dispose()
+                if http is None:
+                    await plane_http.aclose()
+
+    app = FastAPI(
+        title="Project Context Service",
+        version="0.1.0",
+        lifespan=lifespan,
+        dependencies=[Depends(HTTPBearer(auto_error=False))],
+    )
+    app.state.engine = engine
+    app.state.sessions = sessions
+    app.state.service = service
+    app.state.mcp = mcp
+    app.add_middleware(AuthMiddleware, tokens=settings.auth_tokens)
+
+    @app.exception_handler(ServiceError)
+    async def service_error(request: Request, exc: ServiceError):
+        return JSONResponse({"detail": exc.message}, status_code=exc.status)
+
+    @app.get("/health/live")
+    async def live():
+        return {"status": "ok"}
+
+    @app.get("/health/ready")
+    async def ready():
+        async with sessions() as db:
+            try:
+                await db.execute(text("SELECT id FROM projects LIMIT 1"))
+            except Exception:
+                return JSONResponse({"status": "database_unavailable"}, status_code=503)
+        return {"status": "ok"}
+
+    @app.get("/api/projects")
+    async def list_projects():
+        return await service.list_projects()
+
+    @app.post("/api/projects", status_code=201)
+    async def create_project(data: ProjectCreate):
+        return await service.create_project(data)
+
+    @app.post("/api/projects/{project_id}/tasks", status_code=201)
+    async def register_task(project_id: UUID, data: TaskCreate):
+        return await service.register_task(project_id, data.plane_item_id)
+
+    @app.put("/api/projects/{project_id}/documents")
+    async def put_document(project_id: UUID, data: DocumentPut):
+        return await service.put_document(project_id, data)
+
+    @app.get("/api/projects/{project_id}/search")
+    async def search(
+        project_id: UUID,
+        q: Annotated[str, Query(min_length=1, max_length=500)],
+        repo: str | None = None,
+        ref: str | None = None,
+        limit: Annotated[int, Query(ge=1, le=30)] = 10,
+    ):
+        return await service.search(project_id, q, repo, ref, limit)
+
+    @app.get("/api/documents/{document_id}")
+    async def read_document(document_id: UUID):
+        return await service.read_document(document_id)
+
+    @app.get("/api/tasks/{task_id}/context")
+    async def context(
+        task_id: UUID,
+        repo: Annotated[str, Query(min_length=1, max_length=300)],
+        ref: Annotated[str, Query(min_length=1, max_length=200)],
+        refresh: bool = True,
+    ):
+        return await service.context(task_id, repo, ref, refresh)
+
+    @app.get("/api/tasks/{task_id}/history")
+    async def history(
+        task_id: UUID,
+        cursor: str | None = None,
+        limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    ):
+        return await service.history(task_id, cursor, limit)
+
+    @app.post("/api/tasks/{task_id}/sessions", status_code=201)
+    async def start_session(task_id: UUID, data: SessionCreate):
+        return await service.start_session(task_id, data)
+
+    @app.post("/api/tasks/{task_id}/reports", status_code=201)
+    async def submit_report(task_id: UUID, data: ReportCreate):
+        return await service.submit_report(task_id, data)
+
+    @app.post("/api/tasks/{task_id}/transitions")
+    async def transition(task_id: UUID, data: Transition):
+        return await service.transition(task_id, data)
+
+    app.mount("/mcp", mcp_app)
+    return app
+
+
+# Factory mode keeps imports usable for migrations/tests without configured credentials.
+# Run: uvicorn app.main:create_app --factory
