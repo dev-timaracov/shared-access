@@ -10,10 +10,11 @@ from sqlalchemy import text
 
 from app.config import Settings
 from app.main import create_app
+from tests.fakes import MemoryTracker
 
 
 @pytest.fixture
-async def app_client(tmp_path, monkeypatch):
+async def app_client(tmp_path, monkeypatch, request):
     database = os.getenv("TEST_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
     tokens = {
         "admin": {"developer_id": "admin", "role": "admin", "projects": ["*"]},
@@ -59,7 +60,8 @@ async def app_client(tmp_path, monkeypatch):
         database_url=database, auth_tokens=tokens, plane_api_key="fake-key", plane_sync_reports=True
     )
     plane_http = httpx.AsyncClient(transport=httpx.MockTransport(plane))
-    app = create_app(settings, http=plane_http)
+    tracker = MemoryTracker() if getattr(request, "param", None) == "memory" else None
+    app = create_app(settings, http=plane_http, tracker=tracker)
     started, stopped = asyncio.Event(), asyncio.Event()
 
     async def lifespan_task():
@@ -77,6 +79,11 @@ async def app_client(tmp_path, monkeypatch):
         ) as client:
             yield app, client, remote
     finally:
+        # Test data only: make non-Plane mappings compatible with the guarded downgrade.
+        if tracker is not None:
+            async with app.state.sessions() as db:
+                await db.execute(text("UPDATE projects SET tracker_provider = 'plane'"))
+                await db.commit()
         stopped.set()
         await background
     await plane_http.aclose()

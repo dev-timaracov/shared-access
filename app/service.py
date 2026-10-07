@@ -20,6 +20,7 @@ from app.models import (
     now,
 )
 from app.schemas import DocumentPut, ProjectCreate, ReportCreate, SessionCreate, Transition
+from app.trackers.base import TaskSnapshot, TaskTracker, TrackerProject
 
 
 def timestamp(value):
@@ -41,10 +42,17 @@ def report_view(report):
 
 
 class ContextService:
-    def __init__(self, settings, sessions, plane):
+    def __init__(self, settings, sessions, tracker: TaskTracker):
         self.settings = settings
         self.sessions = sessions
-        self.plane = plane
+        self.tracker = tracker
+
+    def tracker_project(self, project) -> TrackerProject:
+        if project.tracker_provider != self.tracker.provider:
+            raise ServiceError(503, "Project tracker does not match the configured adapter")
+        if not project.tracker_workspace or not project.tracker_project_id:
+            raise ServiceError(503, "Task tracker project mapping is not configured")
+        return TrackerProject(project.tracker_workspace, project.tracker_project_id)
 
     @staticmethod
     def require_write():
@@ -82,6 +90,12 @@ class ContextService:
         if "*" not in current_identity().projects and data.slug not in current_identity().projects:
             raise ServiceError(403, "Project is outside your scope")
         values = data.model_dump(mode="json")
+        if data.tracker_provider != self.tracker.provider:
+            raise ServiceError(422, "Project tracker does not match the configured adapter")
+        if data.tracker_project_id:
+            self.tracker.validate_project(
+                TrackerProject(data.tracker_workspace, data.tracker_project_id)
+            )
         async with self.sessions() as db:
             project = Project(**values)
             db.add(project)
@@ -103,16 +117,18 @@ class ContextService:
                 for p in projects
             ]
 
-    async def register_task(self, project_id, plane_item_id):
+    async def register_task(self, project_id, external_id):
         self.require_write()
         async with self.sessions() as db:
-            await self.project(db, project_id)
+            project = await self.project(db, project_id)
+            self.tracker_project(project)
+            self.tracker.validate_external_id(external_id)
             query = select(Task).where(
-                Task.project_id == str(project_id), Task.plane_item_id == str(plane_item_id)
+                Task.project_id == str(project_id), Task.external_id == str(external_id)
             )
             task = await db.scalar(query)
             if task is None:
-                task = Task(project_id=str(project_id), plane_item_id=str(plane_item_id))
+                task = Task(project_id=str(project_id), external_id=str(external_id))
                 db.add(task)
                 try:
                     await db.commit()
@@ -124,7 +140,8 @@ class ContextService:
             return {
                 "id": task.id,
                 "project_id": task.project_id,
-                "plane_item_id": task.plane_item_id,
+                "external_id": task.external_id,
+                "tracker_provider": project.tracker_provider,
             }
 
     async def start_session(self, task_id, data: SessionCreate):
@@ -208,7 +225,7 @@ class ContextService:
                                 await db.flush()
                         except IntegrityError:
                             pass
-                if self.settings.plane_sync_reports and project.plane_project_id:
+                if self.settings.tracker_sync_reports and project.tracker_project_id:
                     db.add(Outbox(report_id=report.id))
                 await db.commit()
             except IntegrityError:
@@ -220,8 +237,9 @@ class ContextService:
             return {
                 "report": report_view(report),
                 "replayed": False,
-                "plane_sync": "queued"
-                if self.settings.plane_sync_reports and project.plane_project_id
+                "tracker_provider": project.tracker_provider,
+                "tracker_sync": "queued"
+                if self.settings.tracker_sync_reports and project.tracker_project_id
                 else "disabled",
             }
 
@@ -300,37 +318,20 @@ class ContextService:
             live = False
             if refresh:
                 try:
-                    # Keep only the fields needed by agents, not a full upstream object.
-                    source = await self.plane.get_context_item(project, task)
-                    warnings.extend(source.pop("_context_warnings", []))
-                    snapshot = {
-                        key: source[key]
-                        for key in (
-                            "id",
-                            "name",
-                            "description_html",
-                            "description_stripped",
-                            "state",
-                            "state_id",
-                            "priority",
-                            "assignees",
-                            "assignee_ids",
-                            "updated_at",
-                            "identifier",
-                            "sequence_id",
-                            "parent",
-                            "parent_id",
-                            "comments",
-                            "description_source",
-                        )
-                        if key in source
-                    }
-                    state = self.plane.state_id(source)
-                    if task.snapshot and self.plane.state_id(task.snapshot) != state:
+                    details = await self.tracker.get_task_context(
+                        self.tracker_project(project), task.external_id
+                    )
+                    warnings.extend(details.warnings)
+                    snapshot = details.snapshot.model_dump(mode="json")
+                    state = details.snapshot.state_id
+                    if (
+                        task.snapshot
+                        and TaskSnapshot.model_validate(task.snapshot).state_id != state
+                    ):
                         db.add(
                             TaskEvent(
                                 task_id=task.id,
-                                actor="plane",
+                                actor=project.tracker_provider,
                                 payload={
                                     "type": "observed_state_change",
                                     "state_id": state,
@@ -348,7 +349,7 @@ class ContextService:
                     warnings.append(exc.message)
             if not live:
                 warnings.append(
-                    "Plane snapshot is cached or unavailable; do not infer current state"
+                    "Tracker snapshot is cached or unavailable; do not infer current state"
                 )
             docs = (
                 await db.scalars(
@@ -393,9 +394,12 @@ class ContextService:
                 "project": {"id": project.id, "slug": project.slug},
                 "repo": repo,
                 "ref": ref,
-                "plane": {
-                    "item_id": task.plane_item_id,
-                    "snapshot": task.snapshot,
+                "tracker": {
+                    "provider": project.tracker_provider,
+                    "item_id": task.external_id,
+                    "snapshot": TaskSnapshot.model_validate(task.snapshot).model_dump(mode="json")
+                    if task.snapshot
+                    else {},
                     "fetched_at": timestamp(task.fetched_at),
                     "freshness": "live" if live else "cached" if task.fetched_at else "unavailable",
                 },
@@ -553,17 +557,18 @@ class ContextService:
         self.require_admin()
         async with self.sessions() as db:
             task, project = await self.task(db, task_id)
-            source = await self.plane.get_item(project, task)
-            previous = self.plane.state_id(source)
+            tracker_project = self.tracker_project(project)
+            source = await self.tracker.get_task(tracker_project, task.external_id)
+            previous = source.state_id
             target = str(data.target_state_id)
             if previous != str(data.expected_state_id):
-                raise ServiceError(409, "Plane state changed; refresh task context")
+                raise ServiceError(409, "Tracker state changed; refresh task context")
             if target not in project.allowed_transitions.get(previous, []):
                 raise ServiceError(403, "Transition is not allowed by project configuration")
-            result = await self.plane.transition(project, task, target)
-            if self.plane.state_id(result) != target:
-                raise ServiceError(502, "Plane did not confirm the requested state")
-            task.snapshot = result
+            result = await self.tracker.transition_task(tracker_project, task.external_id, target)
+            if result.state_id != target:
+                raise ServiceError(502, "Tracker did not confirm the requested state")
+            task.snapshot = result.model_dump(mode="json")
             task.fetched_at = now()
             event = TaskEvent(
                 task_id=task.id,

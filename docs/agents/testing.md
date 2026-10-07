@@ -31,3 +31,8 @@ PostgreSQL, append-only triggers and full-text search.
 Real Plane connectivity requires a separate test workspace and API credentials.
 Automated tests do not modify a real Plane workspace.
 
+The memory adapter verifies that REST, task context, string state transitions and
+the worker operate without any Plane requests or payloads. Plane adapter tests
+verify the normalized contract separately. Migration tests seed a legacy SQLite
+database and verify mappings, snapshots, reports and pending jobs survive upgrade
+and downgrade. This migration preservation test does not replace PostgreSQL CI.

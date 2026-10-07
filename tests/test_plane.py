@@ -1,5 +1,4 @@
 import json
-from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
@@ -7,7 +6,8 @@ import pytest
 
 from app.config import Settings
 from app.errors import ServiceError
-from app.plane import PlaneClient
+from app.trackers.base import TrackerProject, TrackerReport
+from app.trackers.plane import PlaneTaskTracker
 
 
 def config(version="v1"):
@@ -21,8 +21,7 @@ def config(version="v1"):
 @pytest.mark.parametrize("version,field", [("v1", "state"), ("v2", "state_id")])
 async def test_plane_transition_request_fields(version, field):
     item_id, state = str(uuid4()), str(uuid4())
-    project = SimpleNamespace(plane_workspace="team", plane_project_id=str(uuid4()))
-    task = SimpleNamespace(plane_item_id=item_id)
+    project = TrackerProject("team", str(uuid4()))
 
     def remote(request):
         assert request.headers["X-Api-Key"] == "fake"
@@ -31,15 +30,16 @@ async def test_plane_transition_request_fields(version, field):
         return httpx.Response(200, json={"id": item_id, field: state})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(remote)) as http:
-        result = await PlaneClient(config(version), http).transition(project, task, state)
-        assert PlaneClient.state_id(result) == state
+        result = await PlaneTaskTracker(config(version), http).transition_task(
+            project, item_id, state
+        )
+        assert result.state_id == state
 
 
 @pytest.mark.parametrize("fallback_available", [True, False])
 async def test_v2_requirements_fallback_is_explicit(fallback_available):
     item_id = str(uuid4())
-    project = SimpleNamespace(plane_workspace="team", plane_project_id=str(uuid4()))
-    task = SimpleNamespace(plane_item_id=item_id)
+    project = TrackerProject("team", str(uuid4()))
 
     def remote(request):
         if request.url.path.endswith("comments/"):
@@ -63,21 +63,21 @@ async def test_v2_requirements_fallback_is_explicit(fallback_available):
         return httpx.Response(200, json={"id": item_id, "state_id": str(uuid4())})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(remote)) as http:
-        result = await PlaneClient(config("v2"), http).get_context_item(project, task)
-        assert result["comments"][0]["comment_stripped"] == "QA pending"
+        result = await PlaneTaskTracker(config("v2"), http).get_task_context(project, item_id)
+        assert result.snapshot.comments[0]["text"] == "QA pending"
         if fallback_available:
-            assert result["description_html"] == "<p>Spec</p>"
-            assert result["description_source"] == "v1_fallback"
-            assert not result["_context_warnings"]
+            assert result.snapshot.description_html == "<p>Spec</p>"
+            assert result.snapshot.metadata["description_source"] == "v1_fallback"
+            assert not result.warnings
         else:
-            assert result["description_source"] == "unavailable"
-            assert result["_context_warnings"]
+            assert result.snapshot.metadata["description_source"] == "unavailable"
+            assert result.warnings
 
 
 async def test_comment_retry_does_not_duplicate_remote_write():
-    project = SimpleNamespace(plane_workspace="team", plane_project_id=str(uuid4()))
-    task = SimpleNamespace(plane_item_id=str(uuid4()))
-    report = SimpleNamespace(id=str(uuid4()))
+    project = TrackerProject("team", str(uuid4()))
+    task = str(uuid4())
+    report = TrackerReport(str(uuid4()), "done")
     written = []
 
     def remote(request):
@@ -89,8 +89,8 @@ async def test_comment_retry_does_not_duplicate_remote_write():
         return httpx.Response(200, json={"results": written})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(remote)) as http:
-        plane = PlaneClient(config(), http)
+        plane = PlaneTaskTracker(config(), http)
         with pytest.raises(ServiceError, match="unavailable"):
-            await plane.publish_report(project, task, report, "<p>done</p>")
-        await plane.publish_report(project, task, report, "<p>done</p>")
+            await plane.publish_report(project, task, report)
+        await plane.publish_report(project, task, report)
         assert len(written) == 1

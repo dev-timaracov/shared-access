@@ -9,16 +9,41 @@ the developer identity through a ContextVar. Tokens have reader/writer/admin rol
 and project slug scopes. Only administrators with `*` have global access.
 The MVP uses static tokens; it does not implement OAuth discovery or SSO.
 
-PostgreSQL stores projects, Plane task mappings/snapshots, developer sessions,
+PostgreSQL stores projects, external task mappings/snapshots, developer sessions,
 append-only reports, task-to-Git links, revision-bound documentation, observed
 task events and a durable report-comment outbox. Alembic owns the schema.
 
-Plane supplies current task requirements and state. `get_task_context` refreshes
-on demand and explicitly labels unavailable/cached snapshots. v1/v2 request
-differences are isolated in `app/plane.py`. A project's repository allowlist
+`TaskTracker` in `app/trackers/base.py` is the integration interface for current
+requirements, state transitions and report publication. Service and worker receive
+it through dependency injection and do not import or understand provider HTTP shapes.
+DTOs (`TrackerProject`, `TaskSnapshot`, `TaskContext`, `TrackerReport`) are independent
+of ORM models. All snapshots use a normalized state_id and task schema.
+
+`PlaneTaskTracker` in `app/trackers/plane.py` implements this interface, including
+v1/v2 normalization, description fallback, UUID validation and comment deduplication.
+`app/trackers/factory.py` is the composition root used by API and worker. Register a
+new factory there or inject an adapter into `create_app(..., tracker=adapter)`.
+`TASK_TRACKER_PROVIDER` selects the process's adapter; each project stores its provider
+and must match that adapter. Simultaneous mixed providers are not supported yet.
+Credentials stay in adapter-specific settings, not project mappings or tool inputs.
+
+`get_task_context` refreshes on demand and explicitly labels unavailable/cached
+snapshots. A project's repository allowlist
 restricts document/session inputs. A report can link multiple commits; the same
 commit/PR may be linked to several tasks. Git associations are agent claims,
 not facts independently verified against a Git provider.
+
+Canonical mapping fields are tracker_provider, tracker_workspace, tracker_project_id
+and external_id. External task/state IDs are strings; Plane enforces UUIDs inside
+its adapter. Migration 0002 renames the old columns, expands ID lengths and defaults
+existing projects to Plane, preserving snapshots, session/report IDs and outbox jobs.
+Legacy snapshots with state instead of state_id are accepted on read. Downgrade
+rejects non-Plane/oversized mappings to avoid losing data.
+
+Transport-only compatibility aliases live in `app/compat.py` and input schemas:
+Plane projects still accept plane_workspace/plane_project_id/plane_item_id and return
+deprecated plane/plane_sync aliases. New clients use tracker/tracker_sync/external_id.
+PLANE_SYNC_REPORTS remains an alias for TRACKER_SYNC_REPORTS.
 
 Documents are uploaded by an administrator or trusted CI using
 `scripts/sync_docs.py`, which reads tracked blobs at a resolved Git commit SHA.
@@ -52,4 +77,3 @@ Known boundaries: no automatic Git/CI adapter, no incoming webhook ingestion,
 no complete Plane change history/backfill, no OAuth/SSO, no billing/rate-limit layer,
 no automatic approval of architectural decisions. Returned document/report text
 is external data; consuming agents must not treat it as privileged instructions.
-
