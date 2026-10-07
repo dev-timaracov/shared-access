@@ -26,18 +26,19 @@ class Project(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     slug: Mapped[str] = mapped_column(String(80), unique=True)
     name: Mapped[str] = mapped_column(String(200))
-    plane_workspace: Mapped[str | None] = mapped_column(String(100))
-    plane_project_id: Mapped[str | None] = mapped_column(String(36))
+    tracker_provider: Mapped[str] = mapped_column(String(40), default="plane")
+    tracker_workspace: Mapped[str | None] = mapped_column(String(100))
+    tracker_project_id: Mapped[str | None] = mapped_column(String(200))
     repositories: Mapped[list] = mapped_column(json_type, default=list)
     allowed_transitions: Mapped[dict] = mapped_column(json_type, default=dict)
 
 
 class Task(Base):
     __tablename__ = "tasks"
-    __table_args__ = (UniqueConstraint("project_id", "plane_item_id"),)
+    __table_args__ = (UniqueConstraint("project_id", "external_id"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
-    plane_item_id: Mapped[str] = mapped_column(String(36))
+    external_id: Mapped[str] = mapped_column(String(200))
     snapshot: Mapped[dict] = mapped_column(json_type, default=dict)
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

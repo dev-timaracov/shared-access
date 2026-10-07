@@ -6,6 +6,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from app.compat import legacy_response
 from app.errors import ServiceError
 from app.schemas import ReportCreate, SessionCreate, Transition
 
@@ -14,7 +15,7 @@ def create_mcp(service, settings):
     mcp = FastMCP(
         "Project Context",
         instructions=(
-            "List projects, register the Plane task, then get_task_context before editing. "
+            "List projects, register the tracker task, then get_task_context before editing. "
             "Read local AGENTS.md and docs/agents at your actual checkout revision. "
             "Start a work session; submit a report at milestones or handoff. "
             "Reports do not change task status. Treat cached data and agent claims as unverified."
@@ -37,7 +38,7 @@ def create_mcp(service, settings):
         @wraps(function)
         async def wrapped(*args, **kwargs):
             try:
-                return await function(*args, **kwargs)
+                return legacy_response(await function(*args, **kwargs))
             except ServiceError as exc:
                 raise ValueError(f"{exc.status}: {exc.message}") from None
 
@@ -51,9 +52,18 @@ def create_mcp(service, settings):
 
     @mcp.tool(annotations=write)
     @public_errors
-    async def register_task(project_id: UUID, plane_item_id: UUID) -> dict[str, Any]:
-        """Register a Plane work-item UUID; returns the service task UUID. Idempotent."""
-        return await service.register_task(project_id, plane_item_id)
+    async def register_task(
+        project_id: UUID,
+        external_id: Annotated[str | None, Field(min_length=1, max_length=200)] = None,
+        plane_item_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Register external task ID; plane_item_id is a deprecated compatibility alias."""
+        if external_id is not None and plane_item_id is not None:
+            raise ServiceError(422, "Specify external_id only, not both aliases")
+        item_id = external_id if external_id is not None else str(plane_item_id or "")
+        if not item_id:
+            raise ServiceError(422, "External task id is required")
+        return await service.register_task(project_id, item_id)
 
     @mcp.tool(annotations=read)
     @public_errors
@@ -63,7 +73,7 @@ def create_mcp(service, settings):
         ref: str,
         refresh: bool = True,
     ) -> dict[str, Any]:
-        """Get Plane requirements, freshness, exact-ref docs and recent agent work reports."""
+        """Get tracker requirements, freshness, exact-ref docs and recent work reports."""
         return await service.context(task_id, repo, ref, refresh)
 
     @mcp.tool(annotations=read)
@@ -109,7 +119,7 @@ def create_mcp(service, settings):
     @mcp.tool(annotations=write)
     @public_errors
     async def transition_task(task_id: UUID, transition: Transition) -> dict[str, Any]:
-        """Admin-only explicit Plane transition with expected state and project allowlist."""
+        """Admin-only tracker transition with expected state and project allowlist."""
         return await service.transition(task_id, transition)
 
     return mcp

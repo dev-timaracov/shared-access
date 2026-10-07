@@ -119,6 +119,8 @@ async def test_context_freshness_documents_and_fulltext(setup_task):
     context = response.json()
     assert context["plane"]["freshness"] == "live"
     assert context["plane"]["snapshot"]["name"] == "Payment retry"
+    assert context["tracker"]["snapshot"]["state_id"] == remote["state"]
+    assert context["plane"]["snapshot"]["state"] == remote["state"]
     assert context["plane"]["fetched_at"]
     assert len(context["documents"]) == 1
     doc = context["documents"][0]

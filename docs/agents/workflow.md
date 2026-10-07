@@ -1,8 +1,9 @@
 # Agent workflow
 
 1. Read local AGENTS.md and relevant docs at the current checkout revision.
-2. Call list_projects and register_task with the Plane work-item UUID. Store the
-   returned service task UUID; it differs from Plane's ID.
+2. Call list_projects and register_task with the tracker's external_id. For Plane
+   this is the work-item UUID; other adapters may use strings such as TEAM-123.
+   Store the returned service task UUID; it differs from the external ID.
 3. Call get_task_context with repository identifier and current commit SHA.
    Check freshness, recent sessions/reports and warnings. Read full documents
    with read_project_document and more history with get_task_history.

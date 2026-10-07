@@ -1,5 +1,4 @@
 import asyncio
-import html
 import logging
 from datetime import timedelta
 
@@ -8,13 +7,15 @@ from sqlalchemy import and_, or_, select
 
 from app.config import Settings
 from app.db import create_database
+from app.errors import ServiceError
 from app.models import Outbox, Project, Report, Task, now
-from app.plane import PlaneClient
+from app.trackers.base import TaskTracker, TrackerProject, TrackerReport
+from app.trackers.factory import create_task_tracker
 
 logger = logging.getLogger(__name__)
 
 
-async def process_one(sessions, plane):
+async def process_one(sessions, tracker: TaskTracker):
     """Claim a durable job. A lease recovers work after a crashed worker."""
     async with sessions() as db:
         async with db.begin():
@@ -55,8 +56,16 @@ async def process_one(sessions, plane):
         ]
     )
     try:
+        if project.tracker_provider != tracker.provider:
+            raise ServiceError(503, "Project tracker does not match the configured adapter")
+        if not project.tracker_workspace or not project.tracker_project_id:
+            raise ServiceError(503, "Task tracker project mapping is not configured")
         async with asyncio.timeout(60):
-            await plane.publish_report(project, task, report, f"<pre>{html.escape(body)}</pre>")
+            await tracker.publish_report(
+                TrackerProject(project.tracker_workspace, project.tracker_project_id),
+                task.external_id,
+                TrackerReport(report.id, body),
+            )
         status, error = "sent", None
     except Exception as exc:
         # Do not persist upstream bodies, URLs or credentials in retry errors.
@@ -77,10 +86,10 @@ async def main():
     engine, sessions = create_database(settings.database_url)
     try:
         async with httpx.AsyncClient(timeout=20, follow_redirects=False) as http:
-            plane = PlaneClient(settings, http)
+            tracker = create_task_tracker(settings, http)
             while True:
                 try:
-                    worked = await process_one(sessions, plane)
+                    worked = await process_one(sessions, tracker)
                 except Exception:
                     logger.exception("Worker iteration failed")
                     worked = False

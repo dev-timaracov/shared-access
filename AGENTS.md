@@ -8,11 +8,11 @@ Read `docs/agents/architecture.md`, `docs/agents/testing.md` and
 - Every task/document/search operation must check project scope.
 - Derive developer identity from authentication, never from agent parameters.
 - Work reports are append-only. Retry keys must reject changed payloads.
-- Plane is the source of current task state. Cached snapshots must disclose freshness.
+- The task tracker is the source of current task state. Cached snapshots disclose freshness.
+- Service and worker depend on TaskTracker; provider HTTP/payloads belong in adapters.
 - Keep status transitions separate from work reports.
 - Bind documentation to exact repository revisions. Do not silently fall back to main.
 - Agent-reported checks and Git links are unverified until checked against CI/Git.
 - Never put credentials in tool schemas, logs or source control.
 - Model changes require a new Alembic revision, not edits to historical migrations.
 - Run Ruff and the test suite. Report skipped PostgreSQL/integration checks explicitly.
-

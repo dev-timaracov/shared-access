@@ -9,11 +9,11 @@ from fastapi.security import HTTPBearer
 from sqlalchemy import text
 
 from app.auth import AuthMiddleware
+from app.compat import legacy_response
 from app.config import Settings
 from app.db import create_database
 from app.errors import ServiceError
 from app.mcp_server import create_mcp
-from app.plane import PlaneClient
 from app.schemas import (
     DocumentPut,
     ProjectCreate,
@@ -23,13 +23,21 @@ from app.schemas import (
     Transition,
 )
 from app.service import ContextService
+from app.trackers.base import TaskTracker
+from app.trackers.factory import create_task_tracker
 
 
-def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None = None):
+def create_app(
+    settings: Settings | None = None,
+    http: httpx.AsyncClient | None = None,
+    tracker: TaskTracker | None = None,
+):
     settings = settings or Settings()
     engine, sessions = create_database(settings.database_url)
-    plane_http = http or httpx.AsyncClient(timeout=20, follow_redirects=False)
-    service = ContextService(settings, sessions, PlaneClient(settings, plane_http))
+    tracker_http = http or httpx.AsyncClient(timeout=20, follow_redirects=False)
+    service = ContextService(
+        settings, sessions, tracker or create_task_tracker(settings, tracker_http)
+    )
     mcp = create_mcp(service, settings)
     mcp_app = mcp.streamable_http_app()
 
@@ -42,7 +50,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
             finally:
                 await engine.dispose()
                 if http is None:
-                    await plane_http.aclose()
+                    await tracker_http.aclose()
 
     app = FastAPI(
         title="Project Context Service",
@@ -79,11 +87,11 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
 
     @app.post("/api/projects", status_code=201)
     async def create_project(data: ProjectCreate):
-        return await service.create_project(data)
+        return legacy_response(await service.create_project(data))
 
     @app.post("/api/projects/{project_id}/tasks", status_code=201)
     async def register_task(project_id: UUID, data: TaskCreate):
-        return await service.register_task(project_id, data.plane_item_id)
+        return legacy_response(await service.register_task(project_id, data.external_id))
 
     @app.put("/api/projects/{project_id}/documents")
     async def put_document(project_id: UUID, data: DocumentPut):
@@ -110,7 +118,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         ref: Annotated[str, Query(min_length=1, max_length=200)],
         refresh: bool = True,
     ):
-        return await service.context(task_id, repo, ref, refresh)
+        return legacy_response(await service.context(task_id, repo, ref, refresh))
 
     @app.get("/api/tasks/{task_id}/history")
     async def history(
@@ -126,7 +134,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
 
     @app.post("/api/tasks/{task_id}/reports", status_code=201)
     async def submit_report(task_id: UUID, data: ReportCreate):
-        return await service.submit_report(task_id, data)
+        return legacy_response(await service.submit_report(task_id, data))
 
     @app.post("/api/tasks/{task_id}/transitions")
     async def transition(task_id: UUID, data: Transition):

@@ -11,12 +11,13 @@ async def test_outbox_retry_then_delivery(setup_task):
     await client.post(f"/api/tasks/{task['id']}/reports", json=report(session))
 
     class Plane:
+        provider = "plane"
         failed = True
         calls = 0
 
-        async def publish_report(self, project, task, report, html):
+        async def publish_report(self, project, external_id, report):
             self.calls += 1
-            assert "Payment retry" in html
+            assert "Payment retry" in report.content
             if self.failed:
                 raise ServiceError(502, "timeout")
 

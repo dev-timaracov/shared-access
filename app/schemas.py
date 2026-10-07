@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 Short = Annotated[str, Field(min_length=1, max_length=200)]
 SHA = Annotated[str, Field(pattern=r"^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$")]
@@ -14,22 +14,37 @@ class Input(BaseModel):
 class ProjectCreate(Input):
     slug: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,79}$")
     name: Short
-    plane_workspace: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]+$")
-    plane_project_id: UUID | None = None
+    tracker_provider: str = Field(default="plane", min_length=1, max_length=40)
+    tracker_workspace: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        validation_alias=AliasChoices("tracker_workspace", "plane_workspace"),
+    )
+    tracker_project_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        validation_alias=AliasChoices("tracker_project_id", "plane_project_id"),
+    )
     repositories: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
         default_factory=list, max_length=30
     )
     allowed_transitions: dict[str, list[str]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def plane_pair(self):
-        if bool(self.plane_workspace) != bool(self.plane_project_id):
-            raise ValueError("Plane workspace and project id must be configured together")
+    def tracker_pair(self):
+        if bool(self.tracker_workspace) != bool(self.tracker_project_id):
+            raise ValueError("Tracker workspace and project id must be configured together")
         return self
 
 
 class TaskCreate(Input):
-    plane_item_id: UUID
+    external_id: str = Field(
+        min_length=1,
+        max_length=200,
+        validation_alias=AliasChoices("external_id", "plane_item_id"),
+    )
 
 
 class SessionCreate(Input):
@@ -78,6 +93,6 @@ class DocumentPut(Input):
 
 
 class Transition(Input):
-    expected_state_id: UUID
-    target_state_id: UUID
+    expected_state_id: Short
+    target_state_id: Short
     reason: str = Field(min_length=1, max_length=2000)
