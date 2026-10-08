@@ -98,6 +98,11 @@ class DocumentPut(Input):
     source_url: HttpUrl | None = None
 
 
+class ProjectInit(Input):
+    repo: str = Field(min_length=1, max_length=300)
+    ref: SHA
+
+
 class Transition(Input):
     expected_state_id: Short
     target_state_id: Short

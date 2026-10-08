@@ -1,5 +1,6 @@
 services:
   db:
+    restart: always
     image: postgres:17
     environment:
       POSTGRES_DB: context
@@ -15,15 +16,22 @@ services:
       timeout: 5s
       retries: 20
   migrate:
+    restart: always
     build: .
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://context:${POSTGRES_PASSWORD:-context}@db:5432/context
-    command: ["alembic", "upgrade", "head"]
+    command: ["sh", "-c", "rm -f /tmp/migration-ready && alembic upgrade head && touch /tmp/migration-ready && exec sleep infinity"]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/migration-ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
       db:
         condition: service_healthy
   api:
+    restart: always
     build: .
     env_file: .env
     environment:
@@ -32,8 +40,9 @@ services:
       - "0.0.0.0:8000:8000"
     depends_on:
       migrate:
-        condition: service_completed_successfully
+        condition: service_healthy
   worker:
+    restart: always
     build: .
     env_file: .env
     environment:
@@ -41,7 +50,7 @@ services:
     command: ["python", "-m", "app.worker"]
     depends_on:
       migrate:
-        condition: service_completed_successfully
+        condition: service_healthy
 volumes:
   postgres_data:
 

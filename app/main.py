@@ -17,6 +17,7 @@ from app.mcp_server import create_mcp
 from app.schemas import (
     DocumentPut,
     ProjectCreate,
+    ProjectInit,
     ReportCreate,
     RepositoriesAdd,
     SessionCreate,
@@ -95,6 +96,14 @@ def create_app(
     @app.post("/api/projects/{project_id}/repositories")
     async def add_project_repositories(project_id: UUID, data: RepositoriesAdd):
         return await service.add_project_repositories(project_id, data)
+
+    @app.post("/api/projects/{project_id}/init")
+    async def init_project(project_id: UUID, data: ProjectInit):
+        return await service.init_project(project_id, data)
+
+    @app.post("/api/projects/{project_id}/sync")
+    async def sync_project(project_id: UUID):
+        return await service.sync_project(project_id)
 
     @app.get("/api/projects/{project_id}/tasks")
     async def list_tracker_tasks(

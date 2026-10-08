@@ -22,6 +22,7 @@ from app.models import (
 from app.schemas import (
     DocumentPut,
     ProjectCreate,
+    ProjectInit,
     ReportCreate,
     RepositoriesAdd,
     SessionCreate,
@@ -182,6 +183,103 @@ class ContextService:
                 "project_id": task.project_id,
                 "external_id": task.external_id,
                 "tracker_provider": project.tracker_provider,
+            }
+
+    async def init_project(self, project_id, data: ProjectInit):
+        self.require_admin()
+        from app.specifications import specification_templates
+
+        async with self.sessions() as db:
+            project = await self.project(db, project_id)
+            self.check_repo(project, data.repo)
+            documents = []
+            for path, content in specification_templates(project.name).items():
+                doc = await db.scalar(
+                    select(Document).where(
+                        Document.project_id == project.id,
+                        Document.repo == data.repo,
+                        Document.ref == data.ref,
+                        Document.path == path,
+                    )
+                )
+                created = doc is None
+                if created:
+                    doc = Document(
+                        project_id=project.id,
+                        repo=data.repo,
+                        ref=data.ref,
+                        path=path,
+                        content=content,
+                    )
+                    db.add(doc)
+                    try:
+                        await db.flush()
+                    except IntegrityError:
+                        raise ServiceError(409, "Concurrent initialization; retry") from None
+                documents.append({"id": doc.id, "path": path, "created": created})
+            try:
+                await db.commit()
+            except IntegrityError:
+                raise ServiceError(409, "Concurrent initialization; retry") from None
+            return {
+                "project_id": project.id,
+                "repo": data.repo,
+                "ref": data.ref,
+                "documents": documents,
+                "template": True,
+            }
+
+    async def sync_project(self, project_id):
+        self.require_write()
+        async with self.sessions() as db:
+            project = await self.project(db, project_id)
+            mapping = self.tracker_project(project)
+            cursor = None
+            seen = set()
+            snapshots = {}
+            while True:
+                page = await self.tracker.list_tasks(mapping, cursor, 100)
+                for snapshot in page.tasks:
+                    if not snapshot.id or len(snapshot.id) > 200:
+                        raise ServiceError(502, "Tracker returned an invalid task id")
+                    self.tracker.validate_external_id(snapshot.id)
+                    snapshots[snapshot.id] = snapshot
+                if page.next_cursor is None:
+                    break
+                if page.next_cursor in seen:
+                    raise ServiceError(502, "Tracker pagination repeated a cursor")
+                seen.add(page.next_cursor)
+                cursor = page.next_cursor
+            fetched_at = now()
+            created = 0
+            tasks = []
+            existing = {
+                task.external_id: task
+                for task in (
+                    await db.scalars(select(Task).where(Task.project_id == project.id))
+                ).all()
+            }
+            for external_id, snapshot in snapshots.items():
+                task = existing.get(external_id)
+                if task is None:
+                    task = Task(project_id=project.id, external_id=external_id)
+                    db.add(task)
+                    created += 1
+                task.snapshot = snapshot.model_dump(mode="json")
+                task.fetched_at = fetched_at
+                tasks.append(task)
+            try:
+                await db.commit()
+            except IntegrityError:
+                raise ServiceError(409, "Concurrent task sync; retry") from None
+            return {
+                "project_id": project.id,
+                "tracker_provider": project.tracker_provider,
+                "created": created,
+                "updated": len(tasks) - created,
+                "freshness": "live",
+                "fetched_at": timestamp(fetched_at),
+                "tasks": [{"id": t.id, "external_id": t.external_id} for t in tasks],
             }
 
     async def start_session(self, task_id, data: SessionCreate):

@@ -8,7 +8,7 @@ from pydantic import Field
 
 from app.compat import legacy_response
 from app.errors import ServiceError
-from app.schemas import ReportCreate, RepositoriesAdd, SessionCreate, Transition
+from app.schemas import ProjectInit, ReportCreate, RepositoriesAdd, SessionCreate, Transition
 
 
 def create_mcp(service, settings):
@@ -49,6 +49,18 @@ def create_mcp(service, settings):
     async def list_projects() -> dict[str, Any]:
         """List accessible projects and registered repositories."""
         return {"projects": await service.list_projects()}
+
+    @mcp.tool(annotations=write)
+    @public_errors
+    async def init(project_id: UUID, specification: ProjectInit) -> dict[str, Any]:
+        """Admin: create missing draft specifications in Shared Access at an exact commit SHA."""
+        return await service.init_project(project_id, specification)
+
+    @mcp.tool(annotations=write)
+    @public_errors
+    async def sync(project_id: UUID) -> dict[str, Any]:
+        """Import all tracker task pages and refresh local snapshots; preserve work history."""
+        return await service.sync_project(project_id)
 
     @mcp.tool(annotations=read)
     @public_errors

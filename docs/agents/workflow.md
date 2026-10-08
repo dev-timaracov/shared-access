@@ -1,5 +1,24 @@
 # Agent workflow
 
+Administrators can call MCP `init(project_id, specification={repo, ref})` to create
+missing `testing.md`, `agents.md`, `architecture.md` and `report.md` draft documents
+in Shared Access. `ref` must be a full commit SHA and the repository must be
+registered. These are starter templates, not verified Git blobs or specifications
+inferred from source code. Review and replace them with project-specific content;
+existing documents are preserved. No files are written to the client's checkout.
+The equivalent REST endpoint is `POST /api/projects/{project_id}/init` with `{repo, ref}`.
+
+`testing.md` specifies the testing order, commands and acceptance criteria.
+`architecture.md` describes both the system architecture and source code structure.
+`report.md` specifies the AI agent's work report structure, including full commit
+hashes in `commits`, the resulting `head_sha` and each check's tested `commit_sha`.
+
+Writers can call MCP `sync(project_id)` or REST `POST /api/projects/{project_id}/sync`
+to import every tracker task page and refresh local snapshots. The response contains
+local/external task IDs, created/updated counts and freshness time. Repeated calls
+preserve local IDs, sessions and reports; missing upstream tasks are not deleted.
+Upstream failures abort the import; concurrent inserts return 409 and can be retried.
+
 1. Read local AGENTS.md and relevant docs at the current checkout revision.
 2. Call list_projects and list_tracker_tasks to browse live tracker tasks (follow
    next_cursor), then register_task with the tracker's external_id. Administrators

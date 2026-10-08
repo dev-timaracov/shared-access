@@ -1,5 +1,14 @@
 # Architecture
 
+MCP `init` and `sync` share service methods with REST. Initialization is admin-only,
+creates missing draft specification documents for an allowed repository and exact SHA,
+and preserves existing content. Sync requires write access, follows tracker pagination
+and atomically stores the returned task snapshots without deleting work history.
+
+All Compose services use `restart: always`. After successful migration, the migrate
+container stays alive and exposes readiness through a marker healthcheck. API and
+worker depend on that readiness. On restart the marker is removed before migrating.
+
 `app/main.py` exposes REST and mounts Streamable HTTP MCP at `/mcp/`.
 `app/mcp_server.py` publishes the official MCP SDK tools. Both call
 `app/service.py`; tools cannot bypass project permissions or report ownership.
