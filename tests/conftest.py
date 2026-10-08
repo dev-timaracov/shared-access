@@ -25,6 +25,7 @@ async def app_client(tmp_path, monkeypatch, request):
     }
     monkeypatch.setenv("DATABASE_URL", database)
     monkeypatch.setenv("AUTH_TOKENS", json.dumps(tokens))
+    monkeypatch.setenv("AUTH_DISABLED", "false")
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
@@ -57,7 +58,11 @@ async def app_client(tmp_path, monkeypatch, request):
         )
 
     settings = Settings(
-        database_url=database, auth_tokens=tokens, plane_api_key="fake-key", plane_sync_reports=True
+        database_url=database,
+        auth_tokens=tokens,
+        auth_disabled=False,
+        plane_api_key="fake-key",
+        plane_sync_reports=True,
     )
     plane_http = httpx.AsyncClient(transport=httpx.MockTransport(plane))
     tracker = MemoryTracker() if getattr(request, "param", None) == "memory" else None

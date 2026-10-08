@@ -19,9 +19,14 @@ def current_identity() -> Identity:
 class AuthMiddleware:
     """Authenticate REST and MCP in one ASGI boundary; propagate identity to tool tasks."""
 
-    def __init__(self, app, tokens: dict[str, Identity]):
+    def __init__(self, app, tokens: dict[str, Identity], auth_disabled: bool = False):
         self.app = app
         self.tokens = tokens
+        self.local_identity = (
+            Identity(developer_id="local-admin", role="admin", projects=["*"])
+            if auth_disabled
+            else None
+        )
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["path"] in {
@@ -35,8 +40,8 @@ class AuthMiddleware:
             return
         headers = dict(scope["headers"])
         scheme, _, token = headers.get(b"authorization", b"").decode("latin1").partition(" ")
-        identity = None
-        if scheme.lower() == "bearer" and token:
+        identity = self.local_identity
+        if identity is None and scheme.lower() == "bearer" and token:
             for known, candidate in self.tokens.items():
                 if hmac.compare_digest(token.encode(), known.encode()):
                     identity = candidate

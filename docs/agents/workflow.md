@@ -1,7 +1,10 @@
 # Agent workflow
 
 1. Read local AGENTS.md and relevant docs at the current checkout revision.
-2. Call list_projects and register_task with the tracker's external_id. For Plane
+2. Call list_projects and list_tracker_tasks to browse live tracker tasks (follow
+   next_cursor), then register_task with the tracker's external_id. Administrators
+   can append repositories to an existing project with add_project_repositories.
+   For Plane
    this is the work-item UUID; other adapters may use strings such as TEAM-123.
    Store the returned service task UUID; it differs from the external ID.
 3. Call get_task_context with repository identifier and current commit SHA.

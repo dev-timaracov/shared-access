@@ -1,4 +1,11 @@
-from app.trackers.base import TaskContext, TaskSnapshot, TaskTracker, TrackerProject, TrackerReport
+from app.trackers.base import (
+    TaskContext,
+    TaskPage,
+    TaskSnapshot,
+    TaskTracker,
+    TrackerProject,
+    TrackerReport,
+)
 
 
 class MemoryTracker(TaskTracker):
@@ -10,6 +17,9 @@ class MemoryTracker(TaskTracker):
 
     async def get_task(self, project: TrackerProject, external_id: str) -> TaskSnapshot:
         return TaskSnapshot(id=external_id, name="Tracker-independent task", state_id=self.state)
+
+    async def list_tasks(self, project, cursor=None, limit=20):
+        return TaskPage([await self.get_task(project, "TEAM-123")])
 
     async def get_task_context(self, project: TrackerProject, external_id: str) -> TaskContext:
         return TaskContext(await self.get_task(project, external_id), ("Test adapter",))

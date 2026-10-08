@@ -39,6 +39,12 @@ class ProjectCreate(Input):
         return self
 
 
+class RepositoriesAdd(Input):
+    repositories: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        min_length=1, max_length=30
+    )
+
+
 class TaskCreate(Input):
     external_id: str = Field(
         min_length=1,
