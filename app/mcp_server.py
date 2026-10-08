@@ -8,7 +8,7 @@ from pydantic import Field
 
 from app.compat import legacy_response
 from app.errors import ServiceError
-from app.schemas import ReportCreate, SessionCreate, Transition
+from app.schemas import ReportCreate, RepositoriesAdd, SessionCreate, Transition
 
 
 def create_mcp(service, settings):
@@ -49,6 +49,30 @@ def create_mcp(service, settings):
     async def list_projects() -> dict[str, Any]:
         """List accessible projects and registered repositories."""
         return {"projects": await service.list_projects()}
+
+    @mcp.tool(annotations=read)
+    @public_errors
+    async def list_tracker_tasks(
+        project_id: UUID,
+        cursor: Annotated[str | None, Field(min_length=1, max_length=2000)] = None,
+        limit: Annotated[int, Field(ge=1, le=100)] = 20,
+    ) -> dict[str, Any]:
+        """List live tracker tasks, including unregistered tasks; follow next_cursor."""
+        return await service.list_tracker_tasks(project_id, cursor, limit)
+
+    @mcp.tool(annotations=write)
+    @public_errors
+    async def add_project_repositories(
+        project_id: UUID,
+        repositories: Annotated[
+            list[Annotated[str, Field(min_length=1, max_length=300)]],
+            Field(min_length=1, max_length=30),
+        ],
+    ) -> dict[str, Any]:
+        """Administrator: append repositories to an existing project's allowlist."""
+        return await service.add_project_repositories(
+            project_id, RepositoriesAdd(repositories=repositories)
+        )
 
     @mcp.tool(annotations=write)
     @public_errors

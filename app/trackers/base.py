@@ -50,10 +50,24 @@ class TrackerReport:
     content: str
 
 
+@dataclass(frozen=True)
+class TaskPage:
+    tasks: list[TaskSnapshot]
+    next_cursor: str | None = None
+
+
 class TaskTracker(ABC):
     """Integration boundary: adapters must not require database models as inputs."""
 
     provider: str
+
+    async def list_tasks(
+        self, project: TrackerProject, cursor: str | None = None, limit: int = 20
+    ) -> TaskPage:
+        """Read a live page of tasks, including tasks not registered locally."""
+        from app.errors import ServiceError
+
+        raise ServiceError(501, "Task listing is not supported by this tracker")
 
     def validate_project(self, project: TrackerProject) -> None:
         """Optionally enforce provider-specific project identifiers."""

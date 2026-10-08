@@ -6,7 +6,14 @@ import httpx
 
 from app.config import Settings
 from app.errors import ServiceError
-from app.trackers.base import TaskContext, TaskSnapshot, TaskTracker, TrackerProject, TrackerReport
+from app.trackers.base import (
+    TaskContext,
+    TaskPage,
+    TaskSnapshot,
+    TaskTracker,
+    TrackerProject,
+    TrackerReport,
+)
 
 
 class PlaneTaskTracker(TaskTracker):
@@ -73,6 +80,37 @@ class PlaneTaskTracker(TaskTracker):
             parent_id=str(parent["id"] if isinstance(parent, dict) else parent) if parent else None,
             updated_at=raw.get("updated_at"),
         )
+
+    async def list_tasks(self, project, cursor=None, limit=20) -> TaskPage:
+        self.validate_project(project)
+        path = self.item_path(project, "").removesuffix("/")
+        response = await self.request(
+            "GET",
+            path,
+            params={"per_page": limit, **({"cursor": cursor} if cursor else {})},
+        )
+        rows = (
+            response
+            if isinstance(response, list)
+            else (response.get("results") if isinstance(response, dict) else None)
+        )
+        if not isinstance(rows, list) or len(rows) > limit:
+            raise ServiceError(502, "Plane returned an invalid task page")
+        tasks = []
+        for row in rows:
+            try:
+                external_id = str(UUID(row["id"]))
+                tasks.append(self.normalize(row, external_id))
+            except (ValueError, KeyError, TypeError, AttributeError):
+                raise ServiceError(502, "Plane returned an invalid task page") from None
+        next_cursor = None
+        if isinstance(response, dict) and response.get("next_page_results") is not False:
+            next_cursor = response.get("next_cursor")
+            if next_cursor is not None and (
+                not isinstance(next_cursor, str) or not next_cursor or next_cursor == cursor
+            ):
+                raise ServiceError(502, "Plane returned an invalid task cursor")
+        return TaskPage(tasks, next_cursor)
 
     async def get_task(self, project: TrackerProject, external_id: str) -> TaskSnapshot:
         self.validate_project(project)
@@ -158,6 +196,9 @@ class PlaneTaskTracker(TaskTracker):
                 for c in comments
             ):
                 return
+            # Plane can return a next_cursor even on the final (including empty) page.
+            if isinstance(response, dict) and response.get("next_page_results") is False:
+                break
             cursor = response.get("next_cursor") if isinstance(response, dict) else None
             if not cursor:
                 break

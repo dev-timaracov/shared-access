@@ -8,6 +8,10 @@
 the developer identity through a ContextVar. Tokens have reader/writer/admin roles
 and project slug scopes. Only administrators with `*` have global access.
 The MVP uses static tokens; it does not implement OAuth discovery or SSO.
+The explicit `python -m app --no-auth` option (or `AUTH_DISABLED=true`) assigns
+all REST/MCP requests a server-owned `local-admin` identity with global admin
+access. Service authorization and ownership checks still run against that identity.
+This mode is intended for trusted environments; the CLI binds to loopback by default.
 
 PostgreSQL stores projects, external task mappings/snapshots, developer sessions,
 append-only reports, task-to-Git links, revision-bound documentation, observed

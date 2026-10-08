@@ -18,6 +18,7 @@ from app.schemas import (
     DocumentPut,
     ProjectCreate,
     ReportCreate,
+    RepositoriesAdd,
     SessionCreate,
     TaskCreate,
     Transition,
@@ -62,7 +63,9 @@ def create_app(
     app.state.sessions = sessions
     app.state.service = service
     app.state.mcp = mcp
-    app.add_middleware(AuthMiddleware, tokens=settings.auth_tokens)
+    app.add_middleware(
+        AuthMiddleware, tokens=settings.auth_tokens, auth_disabled=settings.auth_disabled
+    )
 
     @app.exception_handler(ServiceError)
     async def service_error(request: Request, exc: ServiceError):
@@ -88,6 +91,18 @@ def create_app(
     @app.post("/api/projects", status_code=201)
     async def create_project(data: ProjectCreate):
         return legacy_response(await service.create_project(data))
+
+    @app.post("/api/projects/{project_id}/repositories")
+    async def add_project_repositories(project_id: UUID, data: RepositoriesAdd):
+        return await service.add_project_repositories(project_id, data)
+
+    @app.get("/api/projects/{project_id}/tasks")
+    async def list_tracker_tasks(
+        project_id: UUID,
+        cursor: Annotated[str | None, Query(min_length=1, max_length=2000)] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ):
+        return await service.list_tracker_tasks(project_id, cursor, limit)
 
     @app.post("/api/projects/{project_id}/tasks", status_code=201)
     async def register_task(project_id: UUID, data: TaskCreate):

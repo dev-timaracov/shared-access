@@ -3,7 +3,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, func, literal_column, or_, select
+from sqlalchemy import and_, func, literal_column, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import current_identity
@@ -19,7 +19,14 @@ from app.models import (
     WorkSession,
     now,
 )
-from app.schemas import DocumentPut, ProjectCreate, ReportCreate, SessionCreate, Transition
+from app.schemas import (
+    DocumentPut,
+    ProjectCreate,
+    ReportCreate,
+    RepositoriesAdd,
+    SessionCreate,
+    Transition,
+)
 from app.trackers.base import TaskSnapshot, TaskTracker, TrackerProject
 
 
@@ -116,6 +123,39 @@ class ContextService:
                 {"id": p.id, "slug": p.slug, "name": p.name, "repositories": p.repositories}
                 for p in projects
             ]
+
+    async def add_project_repositories(self, project_id, data: RepositoriesAdd):
+        self.require_admin()
+        async with self.sessions() as db:
+            project = await self.project(db, project_id)
+            repositories = list(dict.fromkeys([*project.repositories, *data.repositories]))
+            if len(repositories) > 30:
+                raise ServiceError(422, "A project can have at most 30 repositories")
+            result = await db.execute(
+                update(Project)
+                .where(Project.id == project.id, Project.repositories == project.repositories)
+                .values(repositories=repositories)
+                .execution_options(synchronize_session=False)
+            )
+            if result.rowcount != 1:
+                raise ServiceError(409, "Concurrent repository update; retry")
+            await db.commit()
+            return {"id": project.id, "repositories": repositories}
+
+    async def list_tracker_tasks(self, project_id, cursor=None, limit=20):
+        if not 1 <= limit <= 100 or (cursor is not None and (not cursor or len(cursor) > 2000)):
+            raise ServiceError(422, "Limit must be 1..100; cursor must be 1..2000 characters")
+        async with self.sessions() as db:
+            project = await self.project(db, project_id)
+            page = await self.tracker.list_tasks(self.tracker_project(project), cursor, limit)
+            return {
+                "project_id": project.id,
+                "tracker_provider": project.tracker_provider,
+                "tasks": [task.model_dump(mode="json") for task in page.tasks],
+                "next_cursor": page.next_cursor,
+                "freshness": "live",
+                "fetched_at": timestamp(now()),
+            }
 
     async def register_task(self, project_id, external_id):
         self.require_write()
