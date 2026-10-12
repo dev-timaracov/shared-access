@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -44,6 +44,15 @@ class TaskContext:
     warnings: tuple[str, ...] = ()
 
 
+class NewTask(BaseModel):
+    """Provider-neutral creation fields; the tracker chooses the initial state."""
+
+    model_config = {"extra": "forbid", "str_strip_whitespace": True}
+    name: str = Field(min_length=1, max_length=255)
+    description: str = Field(default="", max_length=100000)
+    priority: Literal["urgent", "high", "medium", "low", "none"] = "none"
+
+
 @dataclass(frozen=True)
 class TrackerReport:
     id: str
@@ -60,6 +69,12 @@ class TaskTracker(ABC):
     """Integration boundary: adapters must not require database models as inputs."""
 
     provider: str
+
+    async def create_task(self, project: TrackerProject, data: NewTask) -> TaskSnapshot:
+        """Create a task using project defaults and return its confirmed snapshot."""
+        from app.errors import ServiceError
+
+        raise ServiceError(501, "Task creation is not supported by this tracker")
 
     async def list_tasks(
         self, project: TrackerProject, cursor: str | None = None, limit: int = 20

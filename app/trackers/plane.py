@@ -7,6 +7,7 @@ import httpx
 from app.config import Settings
 from app.errors import ServiceError
 from app.trackers.base import (
+    NewTask,
     TaskContext,
     TaskPage,
     TaskSnapshot,
@@ -117,6 +118,30 @@ class PlaneTaskTracker(TaskTracker):
         self.validate_external_id(external_id)
         raw = await self.request("GET", self.item_path(project, external_id))
         return self.normalize(raw, external_id)
+
+    async def create_task(self, project: TrackerProject, data: NewTask) -> TaskSnapshot:
+        self.validate_project(project)
+        description_html = "<p>" + html.escape(data.description).replace("\n", "<br>") + "</p>"
+        raw = await self.request(
+            "POST",
+            self.item_path(project, "").removesuffix("/"),
+            json={
+                "name": data.name,
+                "description_html": description_html,
+                "priority": data.priority,
+            },
+        )
+        try:
+            external_id = str(UUID(raw["id"]))
+            snapshot = self.normalize(raw, external_id)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            raise ServiceError(502, "Plane returned an invalid created task") from None
+        # v2 omits descriptions on reads; label the submitted text rather than
+        # presenting it as a verified/sanitized upstream description.
+        if snapshot.description_html is None and snapshot.description_stripped is None:
+            snapshot.description_stripped = data.description
+            snapshot.metadata["description_source"] = "creation_input"
+        return snapshot
 
     async def get_task_context(self, project: TrackerProject, external_id: str) -> TaskContext:
         snapshot = await self.get_task(project, external_id)

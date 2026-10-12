@@ -103,3 +103,24 @@ async def test_project_repositories_and_live_tasks(app_client):
             )
         ).json()[0]["repositories"]
     )
+
+
+async def test_project_overview_is_scoped_and_read_only(setup_task):
+    app, client, remote, project, task, _ = setup_task
+    url = f"/api/projects/{project['id']}"
+    client.headers["Authorization"] = "Bearer reader"
+    response = await client.get(url)
+    assert response.status_code == 200, response.text
+    overview = response.json()
+    assert overview["id"] == project["id"]
+    assert overview["tracker_provider"] == "plane"
+    assert overview["tasks"][0]["id"] == task["id"]
+    assert overview["tasks"][0]["freshness"] in {"cached", "unavailable"}
+    assert "content" not in str(overview["documents"])
+    remote["requests"].clear()
+    before = await row_count(app, "tasks")
+    assert (await client.get(url)).status_code == 200
+    assert await row_count(app, "tasks") == before
+    assert remote["requests"] == []
+    client.headers["Authorization"] = "Bearer stranger"
+    assert (await client.get(url)).status_code == 404

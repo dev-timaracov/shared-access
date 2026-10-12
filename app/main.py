@@ -25,7 +25,7 @@ from app.schemas import (
     Transition,
 )
 from app.service import ContextService
-from app.trackers.base import TaskTracker
+from app.trackers.base import NewTask, TaskTracker
 from app.trackers.factory import create_task_tracker
 
 
@@ -93,6 +93,10 @@ def create_app(
     async def create_project(data: ProjectCreate):
         return legacy_response(await service.create_project(data))
 
+    @app.get("/api/projects/{project_id}")
+    async def project_overview(project_id: UUID):
+        return await service.project_overview(project_id)
+
     @app.post("/api/projects/{project_id}/repositories")
     async def add_project_repositories(project_id: UUID, data: RepositoriesAdd):
         return await service.add_project_repositories(project_id, data)
@@ -116,6 +120,10 @@ def create_app(
     @app.post("/api/projects/{project_id}/tasks", status_code=201)
     async def register_task(project_id: UUID, data: TaskCreate):
         return legacy_response(await service.register_task(project_id, data.external_id))
+
+    @app.post("/api/projects/{project_id}/tasks/create", status_code=201)
+    async def create_task(project_id: UUID, data: NewTask):
+        return legacy_response(await service.create_task(project_id, data))
 
     @app.put("/api/projects/{project_id}/documents")
     async def put_document(project_id: UUID, data: DocumentPut):

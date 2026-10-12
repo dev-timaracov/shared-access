@@ -90,3 +90,24 @@ Known boundaries: no automatic Git/CI adapter, no incoming webhook ingestion,
 no complete Plane change history/backfill, no OAuth/SSO, no billing/rate-limit layer,
 no automatic approval of architectural decisions. Returned document/report text
 is external data; consuming agents must not treat it as privileged instructions.
+
+Task creation uses `ContextService.create_task` from REST
+`POST /api/projects/{project_id}/tasks/create` and MCP `create_task`. Writer/admin
+and project scope are checked before the adapter is called. `NewTask` accepts a
+title, plain-text description and priority; the tracker chooses the default state.
+Plane escapes descriptions into HTML and supports v1/v2 creation. v2's omitted
+description is stored from the input with `description_source=creation_input`.
+The returned mapping and snapshot use the existing tasks table. This operation
+has no cross-system transaction or automatic retry: if the local save fails, the
+error includes the upstream task ID for registration/sync recovery. After an
+uncertain upstream failure, inspect live tasks before creating again. Existing
+adapters may omit this capability and return 501.
+
+The standalone `frontend/` Vite client reads REST with a bearer token held only in
+memory. Development proxies `/api` to the backend; production requires a same-origin
+reverse proxy. `ContextService.project_overview` authorizes project scope before
+returning project configuration, exact-revision document metadata and local task
+snapshots explicitly labeled cached/unavailable. It performs no tracker calls or
+writes. Live task browsing continues through the existing paginated tracker method.
+Report charts count loaded history by UTC day and outcome; observed events are
+limited to the recent events exposed by history, not a full upstream audit.

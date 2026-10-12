@@ -36,3 +36,13 @@ the worker operate without any Plane requests or payloads. Plane adapter tests
 verify the normalized contract separately. Migration tests seed a legacy SQLite
 database and verify mappings, snapshots, reports and pending jobs survive upgrade
 and downgrade. This migration preservation test does not replace PostgreSQL CI.
+
+Frontend checks: `cd frontend`, `npm ci`, `npm test`, `npm run build`.
+The Node tests verify report aggregation and escaping of external text. The backend
+suite verifies the read-only project overview and reader/project authorization.
+
+Task creation tests cover Plane v1/v2 POST payloads and escaped descriptions,
+invalid upstream responses, REST/MCP creation and database snapshots, write/project
+scope, input validation, upstream failure without local insertion, and database
+failure recovery through the reported external ID. Remote creation is mocked;
+these tests do not demonstrate atomicity between Plane and PostgreSQL.

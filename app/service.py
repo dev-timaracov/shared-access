@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, literal_column, or_, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.auth import current_identity
 from app.errors import ServiceError
@@ -28,7 +28,7 @@ from app.schemas import (
     SessionCreate,
     Transition,
 )
-from app.trackers.base import TaskSnapshot, TaskTracker, TrackerProject
+from app.trackers.base import NewTask, TaskSnapshot, TaskTracker, TrackerProject
 
 
 def timestamp(value):
@@ -125,6 +125,54 @@ class ContextService:
                 for p in projects
             ]
 
+    async def project_overview(self, project_id):
+        async with self.sessions() as db:
+            project = await self.project(db, project_id)
+            tasks = (
+                await db.scalars(
+                    select(Task).where(Task.project_id == project.id).order_by(Task.external_id)
+                )
+            ).all()
+            documents = (
+                await db.scalars(
+                    select(Document)
+                    .where(Document.project_id == project.id)
+                    .order_by(Document.repo, Document.ref, Document.path)
+                )
+            ).all()
+            return {
+                "id": project.id,
+                "slug": project.slug,
+                "name": project.name,
+                "tracker_provider": project.tracker_provider,
+                "tracker_workspace": project.tracker_workspace,
+                "tracker_project_id": project.tracker_project_id,
+                "repositories": project.repositories,
+                "allowed_transitions": project.allowed_transitions,
+                "tasks": [
+                    {
+                        "id": t.id,
+                        "external_id": t.external_id,
+                        "snapshot": TaskSnapshot.model_validate(
+                            {"id": t.external_id, **t.snapshot}
+                        ).model_dump(mode="json"),
+                        "freshness": "cached" if t.fetched_at else "unavailable",
+                        "fetched_at": timestamp(t.fetched_at),
+                    }
+                    for t in tasks
+                ],
+                "documents": [
+                    {
+                        "id": d.id,
+                        "repo": d.repo,
+                        "ref": d.ref,
+                        "path": d.path,
+                        "updated_at": timestamp(d.updated_at),
+                    }
+                    for d in documents
+                ],
+            }
+
     async def add_project_repositories(self, project_id, data: RepositoriesAdd):
         self.require_admin()
         async with self.sessions() as db:
@@ -156,6 +204,53 @@ class ContextService:
                 "next_cursor": page.next_cursor,
                 "freshness": "live",
                 "fetched_at": timestamp(now()),
+            }
+
+    async def create_task(self, project_id, data: NewTask):
+        self.require_write()
+        async with self.sessions() as db:
+            project = await self.project(db, project_id)
+            snapshot = await self.tracker.create_task(self.tracker_project(project), data)
+            if not snapshot.id or len(snapshot.id) > 200:
+                raise ServiceError(502, "Tracker returned an invalid created task id")
+            self.tracker.validate_external_id(snapshot.id)
+            # A concurrent sync may already have registered this upstream task.
+            query = select(Task).where(
+                Task.project_id == project.id, Task.external_id == snapshot.id
+            )
+            try:
+                task = await db.scalar(query)
+                if task is None:
+                    task = Task(project_id=project.id, external_id=snapshot.id)
+                    db.add(task)
+                task.snapshot = snapshot.model_dump(mode="json")
+                task.fetched_at = now()
+                try:
+                    await db.commit()
+                except IntegrityError:
+                    await db.rollback()
+                    task = await db.scalar(query)
+                    if task is None:
+                        raise
+                    task.snapshot = snapshot.model_dump(mode="json")
+                    task.fetched_at = now()
+                    await db.commit()
+            except SQLAlchemyError:
+                # Remote creation cannot be rolled back by a database transaction.
+                # Expose the recovery ID and avoid suggesting another create POST.
+                raise ServiceError(
+                    503,
+                    f"Task created in tracker (external_id={snapshot.id}), but local save failed. "
+                    "Register this external_id or sync the project; do not repeat creation.",
+                ) from None
+            return {
+                "id": task.id,
+                "project_id": str(project_id),
+                "external_id": task.external_id,
+                "tracker_provider": self.tracker.provider,
+                "snapshot": task.snapshot,
+                "freshness": "live",
+                "fetched_at": timestamp(task.fetched_at),
             }
 
     async def register_task(self, project_id, external_id):

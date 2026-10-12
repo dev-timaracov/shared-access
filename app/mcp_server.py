@@ -9,6 +9,7 @@ from pydantic import Field
 from app.compat import legacy_response
 from app.errors import ServiceError
 from app.schemas import ProjectInit, ReportCreate, RepositoriesAdd, SessionCreate, Transition
+from app.trackers.base import NewTask
 
 
 def create_mcp(service, settings):
@@ -100,6 +101,15 @@ def create_mcp(service, settings):
         if not item_id:
             raise ServiceError(422, "External task id is required")
         return await service.register_task(project_id, item_id)
+
+    @mcp.tool(annotations=write)
+    @public_errors
+    async def create_task(project_id: UUID, task: NewTask) -> dict[str, Any]:
+        """Create a new tracker task and save its mapping/snapshot locally. Requires write access.
+
+        Each call creates a new task; do not blindly retry after an uncertain upstream failure.
+        """
+        return await service.create_task(project_id, task)
 
     @mcp.tool(annotations=read)
     @public_errors
