@@ -1,17 +1,56 @@
 # Agent workflow
 
-Administrators can call MCP `init(project_id, specification={repo, ref})` to create
-missing `testing.md`, `agents.md`, `architecture.md` and `report.md` draft documents
-in Shared Access. `ref` must be a full commit SHA and the repository must be
-registered. These are starter templates, not verified Git blobs or specifications
-inferred from source code. Review and replace them with project-specific content;
-existing documents are preserved. No files are written to the client's checkout.
+Administrators can call MCP `init(project_id, specification={repo, ref})` to get
+project drafts: `AGENTS.md` and `docs/agents/{testing,architecture}.md`, plus
+common standards `docs/agents/{report,style-guide}.md`.
+`ref` must be a full commit SHA and the repository must be registered.
+The response contains `files` with relative `path` and `content`, and
+`write_policy=create_missing`. The agent must write these files into the target
+project's checkout root, preserving existing files. The server cannot write to
+a remote client's filesystem and does not store these drafts in Shared Access.
+`common_files` identifies the standards copied unchanged for every project;
+their canonical sources are packaged under `app/specification_guides/`.
+Project drafts are starter templates, not verified Git blobs or specifications inferred
+from source code. Review and commit project-specific content before uploading it
+using `scripts/sync_docs.py`; only then is it bound to that resulting commit SHA.
 The equivalent REST endpoint is `POST /api/projects/{project_id}/init` with `{repo, ref}`.
+
+For automatic local file creation, run from the Shared Access installation:
+
+```sh
+uv run python -m app.init_project --project-dir /absolute/path/to/target-project --project-id PROJECT_UUID --repo REGISTERED_REPOSITORY_URL
+```
+
+The directory is required; it must be the target Git checkout root and its remote
+must match the registered repository URL (an optional `.git` suffix is tolerated).
+`--ref` defaults to that checkout's HEAD and is resolved there, independently of
+the process working directory. Use `--api-url` for another server and
+`CONTEXT_API_TOKEN` for authenticated servers. Existing files are never overwritten.
+Initialization no longer returns stored document IDs or `created` flags; local
+creation is reported by the command after writing the files.
+
+Only the project drafts are filled from source; report/style-guide standards
+remain identical across projects. Record project exceptions in architecture or
+reviewed decisions. Existing files are preserved; updating an older standard
+is a separate explicit edit, never a silent overwrite by init.
+
+Project-specific content is the responsibility of the coding agent with access
+to the target checkout. Before creating specifications, read existing docs,
+inspect the source tree, manifests, entry points, configuration, CI and tests.
+Replace placeholders with observed components, data flows, real check commands,
+prerequisites and project rules. Record unknowns instead of inventing details;
+commands found in CI are not evidence that checks were executed. Preserve existing
+specifications and propose needed updates separately. The local command only
+creates project scaffolds and copies common standards; it does not analyze code
+or call a model. Agent completion and
+review are required before committing and uploading the finished specifications.
 
 `testing.md` specifies the testing order, commands and acceptance criteria.
 `architecture.md` describes both the system architecture and source code structure.
-`report.md` specifies the AI agent's work report structure, including full commit
-hashes in `commits`, the resulting `head_sha` and each check's tested `commit_sha`.
+`report.md` defines the common report fields, identity/ID/date sources and API
+mapping, full commit hashes, the resulting `head_sha` and tested `commit_sha`.
+`style-guide.md` defines common Python conventions and DDD principles for FastAPI,
+including an example from a pinned MosaiHub backend revision.
 
 Writers can call MCP `sync(project_id)` or REST `POST /api/projects/{project_id}/sync`
 to import every tracker task page and refresh local snapshots. The response contains

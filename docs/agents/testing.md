@@ -13,6 +13,13 @@ downgrade, a mock HTTP Plane API and real MCP client/server protocol calls throu
 ASGI. SQLite is a testing fallback, not a deployment database. Its search is a
 substring fallback; it cannot validate PostgreSQL FTS, locks or report triggers.
 
+Initialization tests verify that REST/MCP return the same file scaffold without
+storing draft documents, and that the local command writes to the selected Git
+checkout even when launched elsewhere. Existing files are preserved; wrong
+repository URLs, unresolved revisions and unexpected file paths are rejected.
+Project drafts still require agent inspection and review. Common report/style
+standards are tested for identical content across different project names.
+
 For PostgreSQL checks, point TEST_DATABASE_URL to a dedicated empty test database:
 
 ```sh

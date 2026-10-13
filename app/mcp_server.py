@@ -51,10 +51,18 @@ def create_mcp(service, settings):
         """List accessible projects and registered repositories."""
         return {"projects": await service.list_projects()}
 
-    @mcp.tool(annotations=write)
+    @mcp.tool(annotations=read)
     @public_errors
     async def init(project_id: UUID, specification: ProjectInit) -> dict[str, Any]:
-        """Admin: create missing draft specifications in Shared Access at an exact commit SHA."""
+        """Admin: get draft files to create in the target project's local checkout.
+
+        Write returned files relative to that project's root, preserving existing files.
+        First inspect the project's source, dependencies, CI and tests; fill the drafts
+        with project-specific architecture, check commands and agent rules.
+        Copy common report.md and Python style-guide.md unchanged for all projects.
+        Follow the returned instructions; disclose unknowns and unexecuted checks.
+        This tool does not write files or store draft documents in Shared Access.
+        """
         return await service.init_project(project_id, specification)
 
     @mcp.tool(annotations=write)

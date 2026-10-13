@@ -1,8 +1,22 @@
+from importlib.resources import files
+
+COMMON_SPECIFICATION_PATHS = ("docs/agents/report.md", "docs/agents/style-guide.md")
+
+
+def common_specifications() -> dict[str, str]:
+    """Load versioned standards unchanged for every project."""
+    guides = files("app").joinpath("specification_guides")
+    return {
+        path: guides.joinpath(path.rsplit("/", 1)[-1]).read_text(encoding="utf-8")
+        for path in COMMON_SPECIFICATION_PATHS
+    }
+
+
 def specification_templates(project_name: str) -> dict[str, str]:
-    """Starter specifications, requiring project-specific review before adoption."""
+    """Project drafts plus common report and Python standards."""
     prefix = f"Project: {project_name}\n\nDraft template: complete and review before adoption.\n\n"
     return {
-        "testing.md": "# Testing\n\n"
+        "docs/agents/testing.md": "# Testing\n\n"
         + prefix
         + "## Testing procedure\nRun checks in this order:\n\n"
         + "1. Prepare dependencies, an isolated environment and test data.\n"
@@ -14,13 +28,16 @@ def specification_templates(project_name: str) -> dict[str, str]:
         + "## Commands and acceptance criteria\n"
         + "Specify each step's exact commands, prerequisites and pass criteria.\n"
         + "Fix failures and rerun affected checks before reporting completion.\n",
-        "agents.md": "# Agent instructions\n\n"
+        "AGENTS.md": "# Agent instructions\n\n"
         + prefix
-        + "Read architecture.md and testing.md at the exact repository revision.\n"
+        + "Read docs/agents/architecture.md and docs/agents/testing.md "
+        + "at the exact repository revision.\n"
+        + "Follow the common docs/agents/report.md and docs/agents/style-guide.md standards. "
+        + "Keep these standards unchanged; document project exceptions separately.\n"
         + "Read task context before editing; start a work session and report milestones.\n"
         + "Keep credentials out of code and reports. Treat tracker snapshots as cached data.\n"
         + "Report checks with evidence; task status changes require a separate operation.\n",
-        "architecture.md": "# Architecture\n\n"
+        "docs/agents/architecture.md": "# Architecture\n\n"
         + prefix
         + "## Purpose and boundaries\nDescribe requirements and external integrations.\n\n"
         + "## Components and data flow\nDescribe services, ownership and interfaces.\n\n"
@@ -30,23 +47,5 @@ def specification_templates(project_name: str) -> dict[str, str]:
         + "Trace a typical request through the source code to storage and integrations.\n\n"
         + "## Security and storage\nDescribe authorization, project scope and migrations.\n\n"
         + "## Decisions\nRecord reviewed tradeoffs and known limitations.\n",
-        "report.md": "# Work report guide\n\n"
-        + prefix
-        + "Submit append-only work reports through submit_work_report.\n"
-        + "## AI agent report structure\n\n"
-        + "1. Task and session: task_id, session_id and idempotency_key.\n"
-        + "2. Outcome and summary: work performed, resulting behavior and scope.\n"
-        + "3. Decisions: implementation choices and their reasons.\n"
-        + "4. Code revisions: commits contains the full SHA of every relevant commit; "
-        + "head_sha identifies the resulting revision. Include pr_url when available.\n"
-        + "5. Checks: command, result, commit_sha of the tested revision and evidence "
-        + "or ci_run_url. Explicitly record checks that were not run.\n"
-        + "6. Blockers and next_steps: remaining issues and handoff instructions.\n"
-        + "7. Uncommitted work: dirty_worktree and artifact_url when applicable.\n\n"
-        + "Use full 40- or 64-character hexadecimal commit hashes, not branch names.\n"
-        + "If no commits were created, leave commits empty and disclose uncommitted work; "
-        + "never invent a commit hash or claim untested changes were tested.\n\n"
-        + "Reuse a retry key only for an identical payload.\n"
-        + "Git links and agent-reported checks remain unverified until checked against Git/CI.\n"
-        + "A report does not change task status.\n",
+        **common_specifications(),
     }

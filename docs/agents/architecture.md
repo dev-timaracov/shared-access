@@ -1,8 +1,13 @@
 # Architecture
 
 MCP `init` and `sync` share service methods with REST. Initialization is admin-only,
-creates missing draft specification documents for an allowed repository and exact SHA,
-and preserves existing content. Sync requires write access, follows tracker pagination
+returns draft file contents for an allowed repository and exact SHA without storing
+them as revision-bound documents. The client writes missing files in the target
+checkout. Project drafts vary by project; common report and Python/DDD standards
+are loaded from packaged `app/specification_guides/*.md` and copied unchanged.
+The response marks these paths as `common_files`. Existing files are preserved.
+`python -m app.init_project --project-dir ...` explicitly selects and
+checks that checkout and its Git remote. Sync requires write access, follows tracker pagination
 and atomically stores the returned task snapshots without deleting work history.
 
 All Compose services use `restart: always`. After successful migration, the migrate

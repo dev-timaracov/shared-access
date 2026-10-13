@@ -56,16 +56,31 @@ async def test_init_sync_protocol_scope_and_retry(app_client):
                     },
                 )
                 assert not result.isError
+                mcp_init = result.structuredContent
+                assert mcp_init["write_policy"] == "create_missing"
                 assert not (await session.call_tool("sync", {"project_id": project["id"]})).isError
-    docs = (await client.post(url + "/init", json=specification)).json()["documents"]
-    assert {d["path"] for d in docs} == {"testing.md", "agents.md", "architecture.md", "report.md"}
-    assert all(not d["created"] for d in docs)
-    await client.put(
-        url + "/documents", json={**specification, "path": "testing.md", "content": "custom"}
+    result = (await client.post(url + "/init", json=specification)).json()
+    assert result == mcp_init
+    assert {d["path"] for d in result["files"]} == {
+        "AGENTS.md",
+        "docs/agents/testing.md",
+        "docs/agents/architecture.md",
+        "docs/agents/report.md",
+        "docs/agents/style-guide.md",
+    }
+    assert set(result["common_files"]) == {"docs/agents/report.md", "docs/agents/style-guide.md"}
+    assert all(
+        "Demo" in d["content"] for d in result["files"] if d["path"] not in result["common_files"]
     )
+    assert await row_count(app, "documents") == 0
+    doc = (
+        await client.put(
+            url + "/documents", json={**specification, "path": "testing.md", "content": "custom"}
+        )
+    ).json()
     await client.post(url + "/init", json=specification)
-    assert (await client.get(f"/api/documents/{docs[0]['id']}")).json()["content"] == "custom"
-    assert await row_count(app, "documents") == 4
+    assert (await client.get(f"/api/documents/{doc['id']}")).json()["content"] == "custom"
+    assert await row_count(app, "documents") == 1
     assert remote["requests"] == []
 
     calls = []

@@ -282,46 +282,37 @@ class ContextService:
 
     async def init_project(self, project_id, data: ProjectInit):
         self.require_admin()
-        from app.specifications import specification_templates
+        from app.specifications import COMMON_SPECIFICATION_PATHS, specification_templates
 
         async with self.sessions() as db:
             project = await self.project(db, project_id)
             self.check_repo(project, data.repo)
-            documents = []
-            for path, content in specification_templates(project.name).items():
-                doc = await db.scalar(
-                    select(Document).where(
-                        Document.project_id == project.id,
-                        Document.repo == data.repo,
-                        Document.ref == data.ref,
-                        Document.path == path,
-                    )
-                )
-                created = doc is None
-                if created:
-                    doc = Document(
-                        project_id=project.id,
-                        repo=data.repo,
-                        ref=data.ref,
-                        path=path,
-                        content=content,
-                    )
-                    db.add(doc)
-                    try:
-                        await db.flush()
-                    except IntegrityError:
-                        raise ServiceError(409, "Concurrent initialization; retry") from None
-                documents.append({"id": doc.id, "path": path, "created": created})
-            try:
-                await db.commit()
-            except IntegrityError:
-                raise ServiceError(409, "Concurrent initialization; retry") from None
             return {
                 "project_id": project.id,
                 "repo": data.repo,
                 "ref": data.ref,
-                "documents": documents,
+                "files": [
+                    {"path": path, "content": content}
+                    for path, content in specification_templates(project.name).items()
+                ],
                 "template": True,
+                "common_files": list(COMMON_SPECIFICATION_PATHS),
+                "write_policy": "create_missing",
+                "instructions": (
+                    "Write these files relative to the target project's checkout root, "
+                    "never the Shared Access server directory. Preserve existing files. "
+                    "Before writing, inspect that project's source tree, dependency manifests, "
+                    "entry points, configuration, CI and tests. Replace template placeholders "
+                    "with project-specific facts: components and data flow in architecture, "
+                    "actual check commands and prerequisites in testing, applicable agent rules "
+                    "in AGENTS.md. report.md and style-guide.md are common standards: "
+                    "copy them unchanged for every project; record exceptions separately. "
+                    "Read existing specifications first and propose any needed updates separately. "
+                    "Disclose unknowns and distinguish observed commands from executed checks. "
+                    "Review and commit the specifications, then upload committed documents "
+                    "with sync_docs. Local CLI output is a scaffold "
+                    "and still needs this agent review."
+                ),
             }
 
     async def sync_project(self, project_id):
