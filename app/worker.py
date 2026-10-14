@@ -43,9 +43,14 @@ async def process_one(sessions, tracker: TaskTracker):
             task = await db.get(Task, report.task_id)
             project = await db.get(Project, task.project_id)
     payload = report.payload
+    developer = (
+        f"{report.developer_name} ({report.developer_id})"
+        if report.developer_name
+        else report.developer_id
+    )
     body = "\n".join(
         [
-            f"Agent report {report.id}; developer: {report.developer_id}",
+            f"Agent report {report.id}; developer: {developer}",
             f"Outcome: {payload['outcome']}",
             payload["summary"],
             "Decisions: " + "; ".join(payload["decisions"]),

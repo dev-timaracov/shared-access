@@ -1,11 +1,14 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import AliasChoices, BaseModel, Field, SecretStr, model_validator
+from pydantic import AliasChoices, BaseModel, Field, SecretStr, StringConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 class Identity(BaseModel):
     developer_id: str = Field(min_length=1, max_length=128)
+    display_name: DisplayName | None = None
     role: Literal["reader", "writer", "admin"] = "reader"
     projects: list[str] = Field(default_factory=list)
 
@@ -15,6 +18,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://context:context@localhost:5432/context"
     auth_tokens: dict[str, Identity] = Field(default_factory=dict, repr=False)
     auth_disabled: bool = False
+    local_admin_display_name: DisplayName | None = None
     plane_base_url: str = "https://api.plane.so"
     plane_api_version: Literal["v1", "v2"] = "v1"
     plane_api_key: SecretStr = SecretStr("")

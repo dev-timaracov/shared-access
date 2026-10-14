@@ -77,6 +77,7 @@ async def test_non_plane_adapter_context_transition_and_outbox(app_client):
     assert await process_one(app.state.sessions, app.state.service.tracker)
     assert len(app.state.service.tracker.published) == 1
     assert "Ready for next developer" in app.state.service.tracker.published[0].content
+    assert "developer: Алиса Иванова (alice)" in app.state.service.tracker.published[0].content
     assert remote["requests"] == []
 
 

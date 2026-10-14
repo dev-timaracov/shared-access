@@ -53,3 +53,8 @@ invalid upstream responses, REST/MCP creation and database snapshots, write/proj
 scope, input validation, upstream failure without local insertion, and database
 failure recovery through the reported external ID. Remote creation is mocked;
 these tests do not demonstrate atomicity between Plane and PostgreSQL.
+
+Developer name tests cover validation, authenticated REST/MCP names, no-auth
+identity, immutable name snapshots across renames and retries, history/context,
+worker publication and unnamed fallback. Migration checks preserve old reports
+with a null name; frontend checks cover display and escaping.

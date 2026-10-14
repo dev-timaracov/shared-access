@@ -54,6 +54,7 @@ async def test_report_idempotency_ownership_and_outbox(setup_task):
     assert response.status_code == 201, response.text
     first = response.json()
     assert first["report"]["developer_id"] == "alice"
+    assert first["report"]["developer_name"] == "Алиса Иванова"
     assert first["plane_sync"] == "queued"
     replay = await client.post(url, json=report(session))
     assert replay.json()["replayed"] is True
@@ -94,6 +95,7 @@ async def test_no_commit_handoff_and_invalid_sha(setup_task):
     assert response.status_code == 201
     assert (await client.post(url, json=report(session, head_sha="short"))).status_code == 422
     assert (await client.post(url, json=report(session, developer_id="fake"))).status_code == 422
+    assert (await client.post(url, json=report(session, developer_name="fake"))).status_code == 422
 
 
 async def test_context_freshness_documents_and_fulltext(setup_task):
@@ -261,6 +263,7 @@ async def test_real_mcp_protocol_and_identity_isolation(setup_task):
                         )
                         assert not sent.isError
                         assert sent.structuredContent["report"]["developer_id"] == "alice"
+                        assert sent.structuredContent["report"]["developer_name"] == "Алиса Иванова"
 
 
 async def test_postgres_append_only_reports(setup_task):

@@ -18,7 +18,12 @@ async def app_client(tmp_path, monkeypatch, request):
     database = os.getenv("TEST_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
     tokens = {
         "admin": {"developer_id": "admin", "role": "admin", "projects": ["*"]},
-        "alice": {"developer_id": "alice", "role": "writer", "projects": ["demo"]},
+        "alice": {
+            "developer_id": "alice",
+            "display_name": "Алиса Иванова",
+            "role": "writer",
+            "projects": ["demo"],
+        },
         "bob": {"developer_id": "bob", "role": "writer", "projects": ["demo"]},
         "reader": {"developer_id": "reader", "role": "reader", "projects": ["demo"]},
         "stranger": {"developer_id": "stranger", "role": "writer", "projects": ["other"]},

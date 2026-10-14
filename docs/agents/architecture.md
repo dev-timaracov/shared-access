@@ -22,6 +22,12 @@ worker depend on that readiness. On restart the marker is removed before migrati
 the developer identity through a ContextVar. Tokens have reader/writer/admin roles
 and project slug scopes. Only administrators with `*` have global access.
 The MVP uses static tokens; it does not implement OAuth discovery or SSO.
+Token identities accept an optional `display_name`; no-auth uses
+`LOCAL_ADMIN_DISPLAY_NAME`. Migration 0003 adds nullable `reports.developer_name`.
+The service snapshots the authenticated name at report creation, independently of
+the retry payload hash. History/context and worker publication use that snapshot;
+renaming an identity does not alter immutable reports or identical retries.
+Reports predating the migration keep a null name and display their developer ID.
 The explicit `python -m app --no-auth` option (or `AUTH_DISABLED=true`) assigns
 all REST/MCP requests a server-owned `local-admin` identity with global admin
 access. Service authorization and ownership checks still run against that identity.

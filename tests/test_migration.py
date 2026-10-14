@@ -56,6 +56,7 @@ async def test_existing_plane_mappings_and_history_survive_upgrade(tmp_path, mon
         assert json.loads(stored) == snapshot
         assert TaskSnapshot.model_validate(json.loads(stored)).state_id == "open"
         assert db.execute("SELECT id, payload_hash FROM reports").fetchone() == ("report", "hash")
+        assert db.execute("SELECT developer_name FROM reports").fetchone() == (None,)
         assert db.execute("SELECT report_id, status FROM outbox").fetchone() == (
             "report",
             "pending",

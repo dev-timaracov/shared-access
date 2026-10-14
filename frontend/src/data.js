@@ -1,4 +1,7 @@
 export const outcomes = {progress:'В работе',implemented:'Реализовано',blocked:'Блокировка',handoff:'Передача'};
+export function reportAuthor(report) {
+  return report.developer_name ? `${report.developer_name} (${report.developer_id})` : report.developer_id;
+}
 export function groupReports(reports) {
   const days = new Map();
   for (const report of reports) {

@@ -65,6 +65,7 @@ class Report(Base):
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"))
     session_id: Mapped[str] = mapped_column(ForeignKey("work_sessions.id"))
     developer_id: Mapped[str] = mapped_column(String(128))
+    developer_name: Mapped[str | None] = mapped_column(String(200))
     idempotency_key: Mapped[str] = mapped_column(String(128))
     payload_hash: Mapped[str] = mapped_column(String(64))
     payload: Mapped[dict] = mapped_column(json_type)

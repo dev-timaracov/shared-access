@@ -42,12 +42,15 @@ async def test_auth_boundary(path, disabled):
     async def endpoint(scope, receive, send):
         actor = current_identity()
         assert actor.developer_id == "local-admin"
+        assert actor.display_name == "Тимур"
         assert actor.role == "admin"
         assert actor.projects == ["*"]
         await send({"type": "http.response.start", "status": 200, "headers": []})
         await send({"type": "http.response.body", "body": b"ok"})
 
-    app = AuthMiddleware(endpoint, tokens={}, auth_disabled=disabled)
+    app = AuthMiddleware(
+        endpoint, tokens={}, auth_disabled=disabled, local_admin_display_name="Тимур"
+    )
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:

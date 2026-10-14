@@ -65,7 +65,10 @@ def create_app(
     app.state.service = service
     app.state.mcp = mcp
     app.add_middleware(
-        AuthMiddleware, tokens=settings.auth_tokens, auth_disabled=settings.auth_disabled
+        AuthMiddleware,
+        tokens=settings.auth_tokens,
+        auth_disabled=settings.auth_disabled,
+        local_admin_display_name=settings.local_admin_display_name,
     )
 
     @app.exception_handler(ServiceError)

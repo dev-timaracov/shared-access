@@ -19,11 +19,22 @@ def current_identity() -> Identity:
 class AuthMiddleware:
     """Authenticate REST and MCP in one ASGI boundary; propagate identity to tool tasks."""
 
-    def __init__(self, app, tokens: dict[str, Identity], auth_disabled: bool = False):
+    def __init__(
+        self,
+        app,
+        tokens: dict[str, Identity],
+        auth_disabled: bool = False,
+        local_admin_display_name: str | None = None,
+    ):
         self.app = app
         self.tokens = tokens
         self.local_identity = (
-            Identity(developer_id="local-admin", role="admin", projects=["*"])
+            Identity(
+                developer_id="local-admin",
+                display_name=local_admin_display_name,
+                role="admin",
+                projects=["*"],
+            )
             if auth_disabled
             else None
         )
