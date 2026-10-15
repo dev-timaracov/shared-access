@@ -3,13 +3,21 @@
 Administrators can call MCP `init(project_id, specification={repo, ref})` to get
 project drafts: `AGENTS.md` and `docs/agents/{testing,architecture}.md`, plus
 common standards `docs/agents/{report,style-guide}.md`.
+It also returns `.agents/skills/{python-unit-tests,work-report,implement-specification,execute-tracker-task}/SKILL.md`.
+These are ready-to-use repository skills, copied unchanged from packaged
+`app/skill_templates/` alongside the common standards. Invoke them with `$skill-name`;
+`execute-tracker-task` resolves a tracker key within the selected project before
+registration, context retrieval, implementation and reporting. An ambiguous number
+requires a project key or confirmed external ID. Re-running init adds missing
+skills to older projects and preserves any existing skill files.
 `ref` must be a full commit SHA and the repository must be registered.
 The response contains `files` with relative `path` and `content`, and
 `write_policy=create_missing`. The agent must write these files into the target
 project's checkout root, preserving existing files. The server cannot write to
 a remote client's filesystem and does not store these drafts in Shared Access.
 `common_files` identifies the standards copied unchanged for every project;
-their canonical sources are packaged under `app/specification_guides/`.
+their canonical sources are packaged under `app/specification_guides/` and
+`app/skill_templates/`.
 Project drafts are starter templates, not verified Git blobs or specifications inferred
 from source code. Review and commit project-specific content before uploading it
 using `scripts/sync_docs.py`; only then is it bound to that resulting commit SHA.
@@ -29,7 +37,7 @@ the process working directory. Use `--api-url` for another server and
 Initialization no longer returns stored document IDs or `created` flags; local
 creation is reported by the command after writing the files.
 
-Only the project drafts are filled from source; report/style-guide standards
+Only the project drafts are filled from source; skills and report/style-guide standards
 remain identical across projects. Record project exceptions in architecture or
 reviewed decisions. Existing files are preserved; updating an older standard
 is a separate explicit edit, never a silent overwrite by init.
@@ -50,7 +58,11 @@ review are required before committing and uploading the finished specifications.
 `report.md` defines the common report fields, identity/ID/date sources and API
 mapping, full commit hashes, the resulting `head_sha` and tested `commit_sha`.
 `style-guide.md` defines common Python conventions and DDD principles for FastAPI,
-including an example from a pinned MosaiHub backend revision.
+including 500 SLOC per file, 50 physical lines per function/method, Black,
+multiline dictionaries, ports, explicit DTO/domain/ORM mappers and small
+application services. Task execution, implementation and Python-test skills
+read this document before editing and check the changed code against it.
+Existing formatter differences and legacy violations are documented in architecture.md.
 
 Writers can call MCP `sync(project_id)` or REST `POST /api/projects/{project_id}/sync`
 to import every tracker task page and refresh local snapshots. The response contains

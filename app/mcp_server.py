@@ -59,7 +59,7 @@ def create_mcp(service, settings):
         Write returned files relative to that project's root, preserving existing files.
         First inspect the project's source, dependencies, CI and tests; fill the drafts
         with project-specific architecture, check commands and agent rules.
-        Copy common report.md and Python style-guide.md unchanged for all projects.
+        Copy common report.md, Python style-guide.md and .agents/skills unchanged.
         Follow the returned instructions; disclose unknowns and unexecuted checks.
         This tool does not write files or store draft documents in Shared Access.
         """

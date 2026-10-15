@@ -5,6 +5,7 @@ from mcp.client.streamable_http import streamable_http_client
 from sqlalchemy import select
 
 from app.models import Task
+from app.specifications import COMMON_SKILL_PATHS, COMMON_SPECIFICATION_PATHS
 from app.trackers.base import TaskPage, TaskSnapshot
 from tests.conftest import row_count
 
@@ -67,8 +68,13 @@ async def test_init_sync_protocol_scope_and_retry(app_client):
         "docs/agents/architecture.md",
         "docs/agents/report.md",
         "docs/agents/style-guide.md",
+        ".agents/skills/python-unit-tests/SKILL.md",
+        ".agents/skills/work-report/SKILL.md",
+        ".agents/skills/implement-specification/SKILL.md",
+        ".agents/skills/execute-tracker-task/SKILL.md",
     }
-    assert set(result["common_files"]) == {"docs/agents/report.md", "docs/agents/style-guide.md"}
+    assert set(result["common_files"]) == set(COMMON_SPECIFICATION_PATHS)
+    assert set(COMMON_SKILL_PATHS) <= set(result["common_files"])
     assert all(
         "Demo" in d["content"] for d in result["files"] if d["path"] not in result["common_files"]
     )

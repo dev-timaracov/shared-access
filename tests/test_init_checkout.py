@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from app.init_project import checkout_revision, main, write_specifications
-from app.specifications import specification_templates
+from app.specifications import COMMON_SKILL_PATHS, specification_templates
 
 
 def files():
@@ -21,9 +21,15 @@ def test_write_to_selected_checkout_preserves_existing_files(tmp_path, monkeypat
     project.mkdir()
     monkeypatch.chdir(server)
     (project / "AGENTS.md").write_text("custom", encoding="utf-8")
+    existing_skill = project / COMMON_SKILL_PATHS[0]
+    existing_skill.parent.mkdir(parents=True)
+    existing_skill.write_text("custom skill", encoding="utf-8")
     result = write_specifications(project, files())
-    assert sum(item["created"] for item in result) == 4
+    assert sum(item["created"] for item in result) == 7
     assert (project / "AGENTS.md").read_text() == "custom"
+    assert existing_skill.read_text() == "custom skill"
+    for path in COMMON_SKILL_PATHS[1:]:
+        assert (project / path).read_text(encoding="utf-8") == specification_templates("Demo")[path]
     assert (project / "docs/agents/testing.md").read_text().startswith("# Testing")
     assert list(server.iterdir()) == []
     assert all(not item["created"] for item in write_specifications(project, files()))
@@ -32,6 +38,13 @@ def test_write_to_selected_checkout_preserves_existing_files(tmp_path, monkeypat
 def test_reject_unexpected_paths_before_writing(tmp_path):
     payload = files()
     payload[-1]["path"] = "../report.md"
+    with pytest.raises(ValueError, match="Unexpected specification paths"):
+        write_specifications(tmp_path, payload)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_reject_incomplete_scaffold_before_writing(tmp_path):
+    payload = [item for item in files() if item["path"] != COMMON_SKILL_PATHS[0]]
     with pytest.raises(ValueError, match="Unexpected specification paths"):
         write_specifications(tmp_path, payload)
     assert list(tmp_path.iterdir()) == []
@@ -90,4 +103,5 @@ def test_cli_selects_project_and_resolves_its_revision(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     main()
     assert (project / "AGENTS.md").is_file()
+    assert all((project / path).is_file() for path in COMMON_SKILL_PATHS)
     assert not (tmp_path / "AGENTS.md").exists()

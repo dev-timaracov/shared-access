@@ -6,6 +6,11 @@ them as revision-bound documents. The client writes missing files in the target
 checkout. Project drafts vary by project; common report and Python/DDD standards
 are loaded from packaged `app/specification_guides/*.md` and copied unchanged.
 The response marks these paths as `common_files`. Existing files are preserved.
+The same scaffold includes four repository-scoped skills under `.agents/skills/`:
+`python-unit-tests`, `work-report`, `implement-specification`, and `execute-tracker-task`.
+Their canonical `SKILL.md` resources live in packaged `app/skill_templates/` and
+are included in `common_files`, copied unchanged across projects. Skills read
+the target checkout's documentation rather than embedding this service's architecture.
 `python -m app.init_project --project-dir ...` explicitly selects and
 checks that checkout and its Git remote. Sync requires write access, follows tracker pagination
 and atomically stores the returned task snapshots without deleting work history.
@@ -122,3 +127,15 @@ snapshots explicitly labeled cached/unavailable. It performs no tracker calls or
 writes. Live task browsing continues through the existing paginated tracker method.
 Report charts count loaded history by UTC day and outcome; observed events are
 limited to the recent events exposed by history, not a full upstream audit.
+
+## Style guide adoption
+
+`docs/agents/style-guide.md` is the local copy of the common Python/DDD standard.
+The current checkout uses Ruff format with a 100-character line length in
+`pyproject.toml` and CI; Black migration is not part of the initialization change.
+Keep the existing formatter for this checkout until that migration is made explicitly.
+The current shared ContextService and some tests predate the 500 SLOC / 50-line
+limits and the finer application-service decomposition. Treat those differences
+as technical debt; this documentation update does not certify full conformance
+or require an unrelated rewrite. Apply the standard to new code and avoid expanding
+existing violations; record any necessary local exceptions in review.

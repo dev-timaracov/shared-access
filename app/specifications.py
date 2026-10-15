@@ -1,6 +1,17 @@
 from importlib.resources import files
 
-COMMON_SPECIFICATION_PATHS = ("docs/agents/report.md", "docs/agents/style-guide.md")
+SKILL_NAMES = (
+    "python-unit-tests",
+    "work-report",
+    "implement-specification",
+    "execute-tracker-task",
+)
+COMMON_SKILL_PATHS = tuple(f".agents/skills/{name}/SKILL.md" for name in SKILL_NAMES)
+COMMON_SPECIFICATION_PATHS = (
+    "docs/agents/report.md",
+    "docs/agents/style-guide.md",
+    *COMMON_SKILL_PATHS,
+)
 
 
 def common_specifications() -> dict[str, str]:
@@ -9,11 +20,15 @@ def common_specifications() -> dict[str, str]:
     return {
         path: guides.joinpath(path.rsplit("/", 1)[-1]).read_text(encoding="utf-8")
         for path in COMMON_SPECIFICATION_PATHS
+        if path not in COMMON_SKILL_PATHS
+    } | {
+        path: files("app").joinpath("skill_templates", name, "SKILL.md").read_text(encoding="utf-8")
+        for name, path in zip(SKILL_NAMES, COMMON_SKILL_PATHS, strict=True)
     }
 
 
 def specification_templates(project_name: str) -> dict[str, str]:
-    """Project drafts plus common report and Python standards."""
+    """Project drafts plus common standards and repository-scoped agent skills."""
     prefix = f"Project: {project_name}\n\nDraft template: complete and review before adoption.\n\n"
     return {
         "docs/agents/testing.md": "# Testing\n\n"

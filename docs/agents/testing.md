@@ -19,6 +19,8 @@ checkout even when launched elsewhere. Existing files are preserved; wrong
 repository URLs, unresolved revisions and unexpected file paths are rejected.
 Project drafts still require agent inspection and review. Common report/style
 standards are tested for identical content across different project names.
+The same checks cover all four packaged skills, REST/MCP parity, creation in the
+selected checkout and preservation of existing skill files on repeated init.
 
 For PostgreSQL checks, point TEST_DATABASE_URL to a dedicated empty test database:
 

@@ -1,4 +1,4 @@
-"""Create missing specification files in an explicitly selected project checkout."""
+"""Create missing specifications and agent skills in a selected project checkout."""
 
 import argparse
 import os
@@ -85,7 +85,7 @@ def main():
         raise ValueError("Initialization response does not match the selected project/revision")
     for item in write_specifications(root, result["files"]):
         print(f"{'Created' if item['created'] else 'Preserved'} {item['path']}")
-    print("Fill project drafts from source; keep common report.md and style-guide.md unchanged.")
+    print("Fill project drafts from source; keep common standards and .agents/skills unchanged.")
 
 
 if __name__ == "__main__":

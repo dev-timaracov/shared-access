@@ -20,7 +20,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["specification_guides/*.md"]
+app = ["specification_guides/*.md", "skill_templates/*/SKILL.md"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
