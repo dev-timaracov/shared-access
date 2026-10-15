@@ -62,6 +62,9 @@ including 500 SLOC per file, 50 physical lines per function/method, Black,
 multiline dictionaries, ports, explicit DTO/domain/ORM mappers and small
 application services. Task execution, implementation and Python-test skills
 read this document before editing and check the changed code against it.
+The optimization section covers profiling and reproducible baselines, algorithmic
+complexity, bounded memory/concurrency, SQL/HTTP batching, cache isolation and
+correctness/performance acceptance criteria.
 Existing formatter differences and legacy violations are documented in architecture.md.
 
 Writers can call MCP `sync(project_id)` or REST `POST /api/projects/{project_id}/sync`
