@@ -2,7 +2,7 @@
 
 Administrators can call MCP `init(project_id, specification={repo, ref})` to get
 project drafts: `AGENTS.md` and `docs/agents/{testing,architecture}.md`, plus
-common standards `docs/agents/{report,style-guide}.md`.
+common standards `docs/agents/{report,style-guide,frontend-style-guide}.md`.
 It also returns `.agents/skills/{python-unit-tests,work-report,implement-specification,execute-tracker-task}/SKILL.md`.
 These are ready-to-use repository skills, copied unchanged from packaged
 `app/skill_templates/` alongside the common standards. Invoke them with `$skill-name`;
@@ -66,6 +66,11 @@ The optimization section covers profiling and reproducible baselines, algorithmi
 complexity, bounded memory/concurrency, SQL/HTTP batching, cache isolation and
 correctness/performance acceptance criteria.
 Existing formatter differences and legacy violations are documented in architecture.md.
+`frontend-style-guide.md` covers analogous JS/TS/UI limits and decomposition,
+Prettier/ESLint, DTO mapping, feature/layer boundaries, application services,
+state, accessibility, security, tests and measured browser performance.
+Task/implementation skills choose the applicable guide by changed files, using
+both for mixed tasks. Init copies both documents without changing a project's stack.
 
 Writers can call MCP `sync(project_id)` or REST `POST /api/projects/{project_id}/sync`
 to import every tracker task page and refresh local snapshots. The response contains

@@ -68,6 +68,7 @@ async def test_init_sync_protocol_scope_and_retry(app_client):
         "docs/agents/architecture.md",
         "docs/agents/report.md",
         "docs/agents/style-guide.md",
+        "docs/agents/frontend-style-guide.md",
         ".agents/skills/python-unit-tests/SKILL.md",
         ".agents/skills/work-report/SKILL.md",
         ".agents/skills/implement-specification/SKILL.md",

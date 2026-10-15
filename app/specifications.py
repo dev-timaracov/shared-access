@@ -10,6 +10,7 @@ COMMON_SKILL_PATHS = tuple(f".agents/skills/{name}/SKILL.md" for name in SKILL_N
 COMMON_SPECIFICATION_PATHS = (
     "docs/agents/report.md",
     "docs/agents/style-guide.md",
+    "docs/agents/frontend-style-guide.md",
     *COMMON_SKILL_PATHS,
 )
 
@@ -47,7 +48,8 @@ def specification_templates(project_name: str) -> dict[str, str]:
         + prefix
         + "Read docs/agents/architecture.md and docs/agents/testing.md "
         + "at the exact repository revision.\n"
-        + "Follow the common docs/agents/report.md and docs/agents/style-guide.md standards. "
+        + "Follow docs/agents/report.md; apply docs/agents/style-guide.md for Python "
+        + "and docs/agents/frontend-style-guide.md for frontend changes. "
         + "Keep these standards unchanged; document project exceptions separately.\n"
         + "Read task context before editing; start a work session and report milestones.\n"
         + "Keep credentials out of code and reports. Treat tracker snapshots as cached data.\n"

@@ -4,6 +4,7 @@ Read `docs/agents/architecture.md`, `docs/agents/testing.md` and
 `docs/agents/workflow.md` before changing behavior.
 Read and apply `docs/agents/style-guide.md` when implementing or testing changes;
 documented legacy differences are listed in `docs/agents/architecture.md`.
+For frontend changes read and apply `docs/agents/frontend-style-guide.md`.
 
 - Python 3.12+, FastAPI, SQLAlchemy async, PostgreSQL and Alembic.
 - REST and MCP must call the same service layer; authorization belongs in that layer.

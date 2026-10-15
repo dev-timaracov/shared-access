@@ -5,6 +5,8 @@ returns draft file contents for an allowed repository and exact SHA without stor
 them as revision-bound documents. The client writes missing files in the target
 checkout. Project drafts vary by project; common report and Python/DDD standards
 are loaded from packaged `app/specification_guides/*.md` and copied unchanged.
+The scaffold also includes `docs/agents/frontend-style-guide.md` for JS/TS/UI;
+skills select the Python or frontend standard by the code being changed.
 The response marks these paths as `common_files`. Existing files are preserved.
 The same scaffold includes four repository-scoped skills under `.agents/skills/`:
 `python-unit-tests`, `work-report`, `implement-specification`, and `execute-tracker-task`.
@@ -139,3 +141,7 @@ limits and the finer application-service decomposition. Treat those differences
 as technical debt; this documentation update does not certify full conformance
 or require an unrelated rewrite. Apply the standard to new code and avoid expanding
 existing violations; record any necessary local exceptions in review.
+The frontend currently uses plain JavaScript and Vite with Node's test runner;
+TypeScript, Prettier and ESLint are not configured. The frontend guide documents
+the target conventions, not a completed tooling migration. Preserve this stack
+for existing code until migration is explicitly included in a task.

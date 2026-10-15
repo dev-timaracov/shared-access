@@ -24,10 +24,14 @@ def test_write_to_selected_checkout_preserves_existing_files(tmp_path, monkeypat
     existing_skill = project / COMMON_SKILL_PATHS[0]
     existing_skill.parent.mkdir(parents=True)
     existing_skill.write_text("custom skill", encoding="utf-8")
+    existing_guide = project / "docs/agents/frontend-style-guide.md"
+    existing_guide.parent.mkdir(parents=True)
+    existing_guide.write_text("custom frontend guide", encoding="utf-8")
     result = write_specifications(project, files())
     assert sum(item["created"] for item in result) == 7
     assert (project / "AGENTS.md").read_text() == "custom"
     assert existing_skill.read_text() == "custom skill"
+    assert existing_guide.read_text() == "custom frontend guide"
     for path in COMMON_SKILL_PATHS[1:]:
         assert (project / path).read_text(encoding="utf-8") == specification_templates("Demo")[path]
     assert (project / "docs/agents/testing.md").read_text().startswith("# Testing")
@@ -103,5 +107,8 @@ def test_cli_selects_project_and_resolves_its_revision(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     main()
     assert (project / "AGENTS.md").is_file()
+    assert (project / "docs/agents/frontend-style-guide.md").read_text(
+        encoding="utf-8"
+    ) == specification_templates("Demo")["docs/agents/frontend-style-guide.md"]
     assert all((project / path).is_file() for path in COMMON_SKILL_PATHS)
     assert not (tmp_path / "AGENTS.md").exists()
