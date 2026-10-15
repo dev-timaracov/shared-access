@@ -143,5 +143,5 @@ or require an unrelated rewrite. Apply the standard to new code and avoid expand
 existing violations; record any necessary local exceptions in review.
 The frontend currently uses plain JavaScript and Vite with Node's test runner;
 TypeScript, Prettier and ESLint are not configured. The frontend guide documents
-the target conventions, not a completed tooling migration. Preserve this stack
+FSD boundaries and target conventions, not a completed architecture/tooling migration. Preserve this stack
 for existing code until migration is explicitly included in a task.

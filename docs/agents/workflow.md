@@ -67,7 +67,7 @@ complexity, bounded memory/concurrency, SQL/HTTP batching, cache isolation and
 correctness/performance acceptance criteria.
 Existing formatter differences and legacy violations are documented in architecture.md.
 `frontend-style-guide.md` covers analogous JS/TS/UI limits and decomposition,
-Prettier/ESLint, DTO mapping, feature/layer boundaries, application services,
+Prettier/ESLint, DTO mapping, Feature-Sliced Design layers/slices/segments and public APIs,
 state, accessibility, security, tests and measured browser performance.
 Task/implementation skills choose the applicable guide by changed files, using
 both for mixed tasks. Init copies both documents without changing a project's stack.
