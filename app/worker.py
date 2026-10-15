@@ -8,7 +8,8 @@ from sqlalchemy import and_, or_, select
 from app.config import Settings
 from app.db import create_database
 from app.errors import ServiceError
-from app.models import Outbox, Project, Report, Task, now
+from app.models import Outbox, Project, Report, Task, WorkSession, now
+from app.report_formatting import format_report
 from app.trackers.base import TaskTracker, TrackerProject, TrackerReport
 from app.trackers.factory import create_task_tracker
 
@@ -42,24 +43,8 @@ async def process_one(sessions, tracker: TaskTracker):
             report = await db.get(Report, job.report_id)
             task = await db.get(Task, report.task_id)
             project = await db.get(Project, task.project_id)
-    payload = report.payload
-    developer = (
-        f"{report.developer_name} ({report.developer_id})"
-        if report.developer_name
-        else report.developer_id
-    )
-    body = "\n".join(
-        [
-            f"Agent report {report.id}; developer: {developer}",
-            f"Outcome: {payload['outcome']}",
-            payload["summary"],
-            "Decisions: " + "; ".join(payload["decisions"]),
-            "Blockers: " + "; ".join(payload["blockers"]),
-            "Next steps: " + "; ".join(payload["next_steps"]),
-            f"Head SHA: {payload['head_sha']}; PR: {payload['pr_url']}",
-            "Checks (agent-reported): " + str(payload["checks"]),
-        ]
-    )
+            work_session = await db.get(WorkSession, report.session_id)
+    body = format_report(report, work_session.agent_client)
     try:
         if project.tracker_provider != tracker.provider:
             raise ServiceError(503, "Project tracker does not match the configured adapter")

@@ -173,7 +173,7 @@ async def test_report_publishes_after_final_page_with_nonempty_cursor(version, e
         await PlaneTaskTracker(config(version), http).publish_report(project, task, report)
     assert calls == ["GET", "POST"]
     assert written[0]["external_id"] == report.id
-    assert written[0]["comment_html"] == "<pre>&lt;done&gt;</pre>"
+    assert written[0]["comment_html"] == "<p>&lt;done&gt;</p>"
 
 
 @pytest.mark.parametrize("version", ["v1", "v2"])

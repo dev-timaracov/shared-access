@@ -72,10 +72,10 @@ async def test_report_name_snapshot_and_publication(app_client):
     context = (await client.get(url + "/context", params={"repo": "repo", "ref": "a" * 40})).json()
     assert context["recent_reports"][0]["developer_name"] == "Иван Иванов"
     assert await process_one(app.state.sessions, app.state.service.tracker)
-    assert "developer: Иван Иванов (admin)" in app.state.service.tracker.published[0].content
+    assert "Разработчик: Иван Иванов (admin)" in app.state.service.tracker.published[0].content
     actor.display_name = None
     unnamed = await client.post(url + "/reports", json=report(session, idempotency_key="unnamed"))
     assert unnamed.status_code == 201, unnamed.text
     assert unnamed.json()["report"]["developer_name"] is None
     assert await process_one(app.state.sessions, app.state.service.tracker)
-    assert "developer: admin\n" in app.state.service.tracker.published[1].content
+    assert "Разработчик: admin\n" in app.state.service.tracker.published[1].content

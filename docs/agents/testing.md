@@ -40,6 +40,10 @@ PostgreSQL, append-only triggers and full-text search.
 Real Plane connectivity requires a separate test workspace and API credentials.
 Automated tests do not modify a real Plane workspace.
 
+Report-formatting tests check blank lines between sections, individual command/result/SHA
+entries, developer identity, empty sections, HTML escaping and paragraph boundaries.
+Plane adapter tests verify the published HTML payload rather than a preformatted text block.
+
 The memory adapter verifies that REST, task context, string state transitions and
 the worker operate without any Plane requests or payloads. Plane adapter tests
 verify the normalized contract separately. Migration tests seed a legacy SQLite

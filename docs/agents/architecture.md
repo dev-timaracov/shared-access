@@ -86,6 +86,12 @@ a trigger. Uniqueness on session + retry key handles concurrent identical retrie
 a payload hash rejects reusing a key for different content. The report and outbox
 job are saved in the same transaction.
 
+`app/report_formatting.py` converts saved reports and individual checks to readable
+text sections separated by blank lines. The Plane adapter escapes that text into
+HTML paragraphs with line breaks and section headings, rather than one `pre`
+block or a Python dictionary representation. This affects publication only;
+stored reports remain immutable. Canonical report.md version 2 documents the format.
+
 The separate worker uses row locks and SKIP LOCKED, retries with backoff, and a
 five-minute lease for crash recovery. It looks for a matching Plane external ID
 before publishing. This is at-least-once delivery with best-effort remote

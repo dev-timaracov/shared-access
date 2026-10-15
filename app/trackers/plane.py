@@ -17,6 +17,19 @@ from app.trackers.base import (
 )
 
 
+def render_report_html(content: str) -> str:
+    paragraphs = []
+    for block in content.replace("\r\n", "\n").split("\n\n"):
+        lines = block.strip().splitlines()
+        if not lines:
+            continue
+        escaped = [html.escape(line) for line in lines]
+        if lines[0].endswith(":"):
+            escaped[0] = f"<strong>{escaped[0]}</strong>"
+        paragraphs.append("<p>" + "<br>".join(escaped) + "</p>")
+    return "".join(paragraphs)
+
+
 class PlaneTaskTracker(TaskTracker):
     """Plane v1/v2 adapter; HTTP, UUID rules and response shapes stay here."""
 
@@ -233,7 +246,7 @@ class PlaneTaskTracker(TaskTracker):
             "POST",
             path,
             json={
-                "comment_html": f"<pre>{html.escape(report.content)}</pre>",
+                "comment_html": render_report_html(report.content),
                 "access": "INTERNAL",
                 **params,
             },
